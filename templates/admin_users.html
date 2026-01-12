@@ -1,4 +1,16 @@
-{{define "content"}}
+{{define "admin_users"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    {{template "navbar" .}}
+    <main class="container">
 <div class="admin-container">
     <div class="admin-header">
         <h1>Gestion de Usuarios</h1>
@@ -7,6 +19,7 @@
             <a href="/admin/users" class="btn btn-primary">Usuarios</a>
             <a href="/admin/filters" class="btn btn-secondary">Filtros</a>
             <a href="/admin/logs" class="btn btn-secondary">Logs</a>
+            <a href="/admin/knowledge" class="btn btn-secondary">Conocimiento</a>
         </div>
     </div>
 
@@ -55,6 +68,7 @@
                     <th>Estado</th>
                     <th>Rol</th>
                     <th>Registro</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -78,12 +92,149 @@
                         {{end}}
                     </td>
                     <td>{{.CreatedAt}}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-warning"
+                                onclick="showPasswordModal({{.ID}}, '{{.Nombre}}')">
+                            Cambiar Contraseña
+                        </button>
+                    </td>
                 </tr>
                 {{end}}
             </tbody>
         </table>
     </section>
-</div>
-{{end}}
 
-{{template "base" .}}
+    <!-- Modal para cambiar contraseña -->
+    <div id="password-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePasswordModal()">&times;</span>
+            <h3>Cambiar Contraseña</h3>
+            <p id="modal-user-name"></p>
+            <form id="password-form" onsubmit="submitPasswordChange(event)">
+                <input type="hidden" id="modal-user-id" name="user_id">
+                <div class="form-group">
+                    <label>Nueva Contraseña</label>
+                    <input type="password" name="new_password" id="new-password" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label>Confirmar Contraseña</label>
+                    <input type="password" id="confirm-password" required minlength="6">
+                </div>
+                <div id="password-error" class="alert alert-error" style="display:none;"></div>
+                <div id="password-success" class="alert alert-success" style="display:none;"></div>
+                <button type="submit" class="btn btn-primary">Cambiar Contraseña</button>
+            </form>
+        </div>
+    </div>
+
+    <style>
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    .modal-content {
+        background: var(--card-bg);
+        padding: 2rem;
+        border-radius: var(--radius);
+        max-width: 400px;
+        width: 90%;
+        position: relative;
+    }
+    .modal-close {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--text-light);
+    }
+    .modal-close:hover {
+        color: var(--danger);
+    }
+    </style>
+
+    <script>
+    function showPasswordModal(userId, userName) {
+        document.getElementById('modal-user-id').value = userId;
+        document.getElementById('modal-user-name').textContent = 'Usuario: ' + userName;
+        document.getElementById('new-password').value = '';
+        document.getElementById('confirm-password').value = '';
+        document.getElementById('password-error').style.display = 'none';
+        document.getElementById('password-success').style.display = 'none';
+        document.getElementById('password-modal').style.display = 'flex';
+    }
+
+    function closePasswordModal() {
+        document.getElementById('password-modal').style.display = 'none';
+    }
+
+    async function submitPasswordChange(e) {
+        e.preventDefault();
+        const userId = document.getElementById('modal-user-id').value;
+        const newPassword = document.getElementById('new-password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+        const errorDiv = document.getElementById('password-error');
+        const successDiv = document.getElementById('password-success');
+
+        errorDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+
+        if (newPassword !== confirmPassword) {
+            errorDiv.textContent = 'Las contraseñas no coinciden';
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            errorDiv.textContent = 'La contraseña debe tener al menos 6 caracteres';
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('new_password', newPassword);
+
+            const response = await fetch('/admin/user/' + userId + '/password', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                successDiv.textContent = 'Contraseña actualizada correctamente';
+                successDiv.style.display = 'block';
+                setTimeout(closePasswordModal, 2000);
+            } else {
+                const text = await response.text();
+                errorDiv.textContent = text || 'Error al cambiar contraseña';
+                errorDiv.style.display = 'block';
+            }
+        } catch (err) {
+            errorDiv.textContent = 'Error de conexión';
+            errorDiv.style.display = 'block';
+        }
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('password-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closePasswordModal();
+        }
+    });
+    </script>
+</div>
+    </main>
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+</body>
+</html>
+{{end}}

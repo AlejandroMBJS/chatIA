@@ -130,12 +130,66 @@ CREATE INDEX IF NOT EXISTS idx_security_logs_created ON security_logs(created_at
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, read);
 
+-- ============ BASE DE CONOCIMIENTO ============
+-- Conocimiento aprobado que la IA puede usar como contexto
+CREATE TABLE IF NOT EXISTS knowledge_base (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    category TEXT DEFAULT 'general',
+    submitted_by INTEGER NOT NULL,
+    approved_by INTEGER,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT (datetime('now')),
+    approved_at DATETIME,
+    FOREIGN KEY (submitted_by) REFERENCES users(id),
+    FOREIGN KEY (approved_by) REFERENCES users(id)
+);
+
+-- Solicitudes pendientes de conocimiento
+CREATE TABLE IF NOT EXISTS knowledge_submissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    category TEXT DEFAULT 'general',
+    submitted_by INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    admin_notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT (datetime('now')),
+    reviewed_at DATETIME,
+    reviewed_by INTEGER,
+    FOREIGN KEY (submitted_by) REFERENCES users(id),
+    FOREIGN KEY (reviewed_by) REFERENCES users(id)
+);
+
+-- Preguntas sin respuesta que necesitan entrenamiento
+CREATE TABLE IF NOT EXISTS unanswered_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT NOT NULL,
+    asked_by INTEGER NOT NULL,
+    conversation_id INTEGER,
+    answer TEXT DEFAULT '',
+    answered_by INTEGER,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'answered', 'ignored')),
+    add_to_knowledge INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT (datetime('now')),
+    answered_at DATETIME,
+    FOREIGN KEY (asked_by) REFERENCES users(id),
+    FOREIGN KEY (answered_by) REFERENCES users(id),
+    FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_active ON knowledge_base(is_active);
+CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge_base(category);
+CREATE INDEX IF NOT EXISTS idx_submissions_status ON knowledge_submissions(status);
+CREATE INDEX IF NOT EXISTS idx_questions_status ON unanswered_questions(status);
+
 -- ============ DATOS INICIALES ============
 
 -- Usuario admin por defecto (password: admin123)
 -- Hash generado con bcrypt cost 10
 INSERT OR IGNORE INTO users (nomina, password_hash, nombre, approved, is_admin)
-VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqZv0EB.PwtR8v4eXdR8j5F5.5K6e', 'Administrador', 1, 1);
+VALUES ('admin', '$2a$10$Iw6JSavGrirhkkoDsvY9leKrgEHjH913k1e8/NixaGaffrq4sWgNK', 'Administrador', 1, 1);
 
 -- Categorias de filtros predeterminadas
 INSERT OR IGNORE INTO filter_categories (name, description) VALUES

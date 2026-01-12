@@ -41,6 +41,29 @@ func (n *NotificationService) NotifyAdminsNewUser(ctx context.Context, userName,
 	return nil
 }
 
+// NotifyAdminsUrgentApproval notifica a los admins sobre una solicitud urgente de aprobacion
+func (n *NotificationService) NotifyAdminsUrgentApproval(ctx context.Context, userName, userNomina string) error {
+	adminIDs, err := n.queries.GetAdminUserIDs(ctx)
+	if err != nil {
+		return fmt.Errorf("error obteniendo admins: %w", err)
+	}
+
+	for _, adminID := range adminIDs {
+		_, err := n.queries.CreateNotification(ctx, db.CreateNotificationParams{
+			UserID:  adminID,
+			Type:    "user_pending",
+			Title:   "URGENTE: Usuario solicita aprobacion",
+			Message: fmt.Sprintf("El usuario %s (%s) solicita aprobacion URGENTE. Por favor revisa en /admin", userName, userNomina),
+		})
+		if err != nil {
+			log.Printf("[ERROR] Error creando notificacion urgente para admin %d: %v", adminID, err)
+		}
+	}
+
+	log.Printf("[INFO] Notificacion URGENTE enviada a %d admins sobre usuario: %s", len(adminIDs), userNomina)
+	return nil
+}
+
 // NotifyUserApproved notifica al usuario que su cuenta fue aprobada
 func (n *NotificationService) NotifyUserApproved(ctx context.Context, userID int64) error {
 	_, err := n.queries.CreateNotification(ctx, db.CreateNotificationParams{
@@ -125,4 +148,27 @@ func (n *NotificationService) MarkAsRead(ctx context.Context, notificationID, us
 func (n *NotificationService) MarkAllAsRead(ctx context.Context, userID int64) error {
 	_, err := n.queries.MarkAllNotificationsRead(ctx, userID)
 	return err
+}
+
+// NotifyAdminsKnowledgeSubmission notifica a los admins sobre nuevo envio de conocimiento
+func (n *NotificationService) NotifyAdminsKnowledgeSubmission(ctx context.Context, userName, title string) error {
+	adminIDs, err := n.queries.GetAdminUserIDs(ctx)
+	if err != nil {
+		return fmt.Errorf("error obteniendo admins: %w", err)
+	}
+
+	for _, adminID := range adminIDs {
+		_, err := n.queries.CreateNotification(ctx, db.CreateNotificationParams{
+			UserID:  adminID,
+			Type:    "system",
+			Title:   "Nuevo conocimiento pendiente",
+			Message: fmt.Sprintf("%s envio nuevo conocimiento: '%s'. Requiere revision en /admin/knowledge", userName, title),
+		})
+		if err != nil {
+			log.Printf("[ERROR] Error creando notificacion de conocimiento para admin %d: %v", adminID, err)
+		}
+	}
+
+	log.Printf("[INFO] Notificacion de conocimiento enviada a %d admins", len(adminIDs))
+	return nil
 }

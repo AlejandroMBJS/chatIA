@@ -1,10 +1,10 @@
 {{define "base"}}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Title}} - GIA Chat</title>
+    <title>{{.Title}} - AQUILA</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/ws.js"></script>
     <link rel="stylesheet" href="/static/styles.css">
@@ -13,23 +13,32 @@
     {{if .User}}
     <nav class="navbar">
         <div class="nav-brand">
-            <a href="/chat">GIA Chat</a>
+            <a href="/chat">AQUILA</a>
         </div>
         <div class="nav-links">
-            <a href="/chat" class="nav-link">Chat Grupal</a>
-            <a href="/ai" class="nav-link">Chat IA</a>
+            <a href="/chat" class="nav-link">{{if .T}}{{index .T "group_chat"}}{{else}}Chat Grupal{{end}}</a>
+            <a href="/ai" class="nav-link">{{if .T}}{{index .T "ai_chat"}}{{else}}Chat IA{{end}}</a>
             {{if .User.IsAdmin}}
             <a href="/admin" class="nav-link admin-link">Admin</a>
             {{end}}
         </div>
         <div class="nav-user">
+            <div class="lang-selector">
+                <a href="/set-language?lang=es" class="lang-btn {{if eq .Lang "es"}}active{{end}}" title="Espanol">ES</a>
+                <a href="/set-language?lang=en" class="lang-btn {{if eq .Lang "en"}}active{{end}}" title="English">EN</a>
+            </div>
             <span class="user-name">{{.User.Nombre}}</span>
             <span class="user-nomina">({{.User.Nomina}})</span>
             <form action="/logout" method="POST" class="logout-form">
-                <button type="submit" class="btn btn-logout">Salir</button>
+                <button type="submit" class="btn btn-logout">{{if .T}}{{index .T "logout"}}{{else}}Salir{{end}}</button>
             </form>
         </div>
     </nav>
+    {{else}}
+    <div class="lang-selector-guest">
+        <a href="/set-language?lang=es" class="lang-btn {{if eq .Lang "es"}}active{{end}}" title="Espanol">ES</a>
+        <a href="/set-language?lang=en" class="lang-btn {{if eq .Lang "en"}}active{{end}}" title="English">EN</a>
+    </div>
     {{end}}
 
     <main class="container">
@@ -37,7 +46,7 @@
     </main>
 
     <footer class="footer">
-        <p>GIA Chat - Sistema de Comunicacion Empresarial</p>
+        <p>AQUILA - IRIS IA Chat</p>
     </footer>
 </body>
 </html>

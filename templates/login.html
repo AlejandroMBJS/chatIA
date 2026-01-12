@@ -1,40 +1,61 @@
-{{define "content"}}
-<div class="auth-container">
-    <div class="auth-card">
-        <div class="auth-header">
-            <h1>GIA Chat</h1>
-            <p>Sistema de Comunicacion Empresarial</p>
-        </div>
-
-        {{if .Error}}
-        <div class="alert alert-error">
-            {{.Error}}
-        </div>
-        {{end}}
-
-        <form action="/login" method="POST" class="auth-form">
-            <div class="form-group">
-                <label for="nomina">Numero de Nomina</label>
-                <input type="text" id="nomina" name="nomina" required
-                       placeholder="Ingresa tu nomina" autocomplete="username">
-            </div>
-
-            <div class="form-group">
-                <label for="password">Contrasena</label>
-                <input type="password" id="password" name="password" required
-                       placeholder="Ingresa tu contrasena" autocomplete="current-password">
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-block">
-                Iniciar Sesion
-            </button>
-        </form>
-
-        <div class="auth-footer">
-            <p>No tienes cuenta? <a href="/register">Registrate aqui</a></p>
-        </div>
+{{define "login"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="lang-selector-guest">
+        <a href="/set-language?lang=es" class="lang-btn {{if eq .Lang "es"}}active{{end}}" title="Espanol">ES</a>
+        <a href="/set-language?lang=en" class="lang-btn {{if eq .Lang "en"}}active{{end}}" title="English">EN</a>
     </div>
-</div>
-{{end}}
 
-{{template "base" .}}
+    <main class="container">
+        <div class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <img src="/static/logo.svg" alt="AQUILA" class="auth-logo">
+                    <h1>AQUILA</h1>
+                    <p>IRIS IA Chat</p>
+                </div>
+
+                {{if .Error}}
+                <div class="alert alert-error">
+                    {{.Error}}
+                </div>
+                {{end}}
+
+                <form action="/login" method="POST" class="auth-form">
+                    <div class="form-group">
+                        <label for="nomina">{{if .T}}{{index .T "nomina"}}{{else}}Numero de Nomina{{end}}</label>
+                        <input type="text" id="nomina" name="nomina" required
+                               placeholder="{{if eq .Lang "en"}}Enter your employee ID{{else}}Ingresa tu nomina{{end}}" autocomplete="username">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">{{if .T}}{{index .T "password"}}{{else}}Contrasena{{end}}</label>
+                        <input type="password" id="password" name="password" required
+                               placeholder="{{if eq .Lang "en"}}Enter your password{{else}}Ingresa tu contrasena{{end}}" autocomplete="current-password">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">
+                        {{if .T}}{{index .T "login"}}{{else}}Iniciar Sesion{{end}}
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>{{if .T}}{{index .T "no_account"}}{{else}}No tienes cuenta?{{end}} <a href="/register">{{if eq .Lang "en"}}Register here{{else}}Registrate aqui{{end}}</a></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+</body>
+</html>
+{{end}}

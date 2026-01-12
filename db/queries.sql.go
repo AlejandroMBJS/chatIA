@@ -11,6 +11,44 @@ import (
 	"time"
 )
 
+const answerQuestion = `-- name: AnswerQuestion :execresult
+UPDATE unanswered_questions
+SET answer = ?, answered_by = ?, status = 'answered', answered_at = datetime('now'), add_to_knowledge = ?
+WHERE id = ? AND status = 'pending'
+`
+
+type AnswerQuestionParams struct {
+	Answer         sql.NullString `json:"answer"`
+	AnsweredBy     sql.NullInt64  `json:"answered_by"`
+	AddToKnowledge sql.NullInt64  `json:"add_to_knowledge"`
+	ID             int64          `json:"id"`
+}
+
+func (q *Queries) AnswerQuestion(ctx context.Context, arg AnswerQuestionParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, answerQuestion,
+		arg.Answer,
+		arg.AnsweredBy,
+		arg.AddToKnowledge,
+		arg.ID,
+	)
+}
+
+const approveSubmission = `-- name: ApproveSubmission :execresult
+UPDATE knowledge_submissions
+SET status = 'approved', reviewed_at = datetime('now'), reviewed_by = ?, admin_notes = ?
+WHERE id = ? AND status = 'pending'
+`
+
+type ApproveSubmissionParams struct {
+	ReviewedBy sql.NullInt64  `json:"reviewed_by"`
+	AdminNotes sql.NullString `json:"admin_notes"`
+	ID         int64          `json:"id"`
+}
+
+func (q *Queries) ApproveSubmission(ctx context.Context, arg ApproveSubmissionParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, approveSubmission, arg.ReviewedBy, arg.AdminNotes, arg.ID)
+}
+
 const approveUser = `-- name: ApproveUser :execresult
 UPDATE users SET approved = 1, updated_at = datetime('now')
 WHERE id = ? AND approved = 0
@@ -26,6 +64,17 @@ SELECT COUNT(*) as count FROM security_filters WHERE is_active = 1
 
 func (q *Queries) CountActiveFilters(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countActiveFilters)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countActiveKnowledge = `-- name: CountActiveKnowledge :one
+SELECT COUNT(*) as count FROM knowledge_base WHERE is_active = 1
+`
+
+func (q *Queries) CountActiveKnowledge(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countActiveKnowledge)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -59,6 +108,28 @@ SELECT COUNT(*) as count FROM group_messages
 
 func (q *Queries) CountGroupMessages(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countGroupMessages)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPendingQuestions = `-- name: CountPendingQuestions :one
+SELECT COUNT(*) as count FROM unanswered_questions WHERE status = 'pending'
+`
+
+func (q *Queries) CountPendingQuestions(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPendingQuestions)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPendingSubmissions = `-- name: CountPendingSubmissions :one
+SELECT COUNT(*) as count FROM knowledge_submissions WHERE status = 'pending'
+`
+
+func (q *Queries) CountPendingSubmissions(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPendingSubmissions)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -222,6 +293,83 @@ func (q *Queries) CreateGroupMessage(ctx context.Context, arg CreateGroupMessage
 	return i, err
 }
 
+const createKnowledge = `-- name: CreateKnowledge :one
+
+INSERT INTO knowledge_base (title, content, category, submitted_by, approved_by, is_active, approved_at)
+VALUES (?, ?, ?, ?, ?, 1, datetime('now'))
+RETURNING id, title, content, category, submitted_by, approved_by, is_active, created_at, approved_at
+`
+
+type CreateKnowledgeParams struct {
+	Title       string         `json:"title"`
+	Content     string         `json:"content"`
+	Category    sql.NullString `json:"category"`
+	SubmittedBy int64          `json:"submitted_by"`
+	ApprovedBy  sql.NullInt64  `json:"approved_by"`
+}
+
+// ============ KNOWLEDGE BASE ============
+func (q *Queries) CreateKnowledge(ctx context.Context, arg CreateKnowledgeParams) (KnowledgeBase, error) {
+	row := q.db.QueryRowContext(ctx, createKnowledge,
+		arg.Title,
+		arg.Content,
+		arg.Category,
+		arg.SubmittedBy,
+		arg.ApprovedBy,
+	)
+	var i KnowledgeBase
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Content,
+		&i.Category,
+		&i.SubmittedBy,
+		&i.ApprovedBy,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.ApprovedAt,
+	)
+	return i, err
+}
+
+const createKnowledgeSubmission = `-- name: CreateKnowledgeSubmission :one
+
+INSERT INTO knowledge_submissions (title, content, category, submitted_by)
+VALUES (?, ?, ?, ?)
+RETURNING id, title, content, category, submitted_by, status, admin_notes, created_at, reviewed_at, reviewed_by
+`
+
+type CreateKnowledgeSubmissionParams struct {
+	Title       string         `json:"title"`
+	Content     string         `json:"content"`
+	Category    sql.NullString `json:"category"`
+	SubmittedBy int64          `json:"submitted_by"`
+}
+
+// ============ KNOWLEDGE SUBMISSIONS ============
+func (q *Queries) CreateKnowledgeSubmission(ctx context.Context, arg CreateKnowledgeSubmissionParams) (KnowledgeSubmission, error) {
+	row := q.db.QueryRowContext(ctx, createKnowledgeSubmission,
+		arg.Title,
+		arg.Content,
+		arg.Category,
+		arg.SubmittedBy,
+	)
+	var i KnowledgeSubmission
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Content,
+		&i.Category,
+		&i.SubmittedBy,
+		&i.Status,
+		&i.AdminNotes,
+		&i.CreatedAt,
+		&i.ReviewedAt,
+		&i.ReviewedBy,
+	)
+	return i, err
+}
+
 const createNotification = `-- name: CreateNotification :one
 
 INSERT INTO notifications (user_id, type, title, message)
@@ -372,6 +520,38 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 	return i, err
 }
 
+const createUnansweredQuestion = `-- name: CreateUnansweredQuestion :one
+
+INSERT INTO unanswered_questions (question, asked_by, conversation_id)
+VALUES (?, ?, ?)
+RETURNING id, question, asked_by, conversation_id, answer, answered_by, status, add_to_knowledge, created_at, answered_at
+`
+
+type CreateUnansweredQuestionParams struct {
+	Question       string        `json:"question"`
+	AskedBy        int64         `json:"asked_by"`
+	ConversationID sql.NullInt64 `json:"conversation_id"`
+}
+
+// ============ UNANSWERED QUESTIONS ============
+func (q *Queries) CreateUnansweredQuestion(ctx context.Context, arg CreateUnansweredQuestionParams) (UnansweredQuestion, error) {
+	row := q.db.QueryRowContext(ctx, createUnansweredQuestion, arg.Question, arg.AskedBy, arg.ConversationID)
+	var i UnansweredQuestion
+	err := row.Scan(
+		&i.ID,
+		&i.Question,
+		&i.AskedBy,
+		&i.ConversationID,
+		&i.Answer,
+		&i.AnsweredBy,
+		&i.Status,
+		&i.AddToKnowledge,
+		&i.CreatedAt,
+		&i.AnsweredAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 
 INSERT INTO users (nomina, password_hash, nombre, departamento)
@@ -446,6 +626,14 @@ func (q *Queries) DeleteFilterCategory(ctx context.Context, id int64) (sql.Resul
 	return q.db.ExecContext(ctx, deleteFilterCategory, id)
 }
 
+const deleteKnowledge = `-- name: DeleteKnowledge :execresult
+DELETE FROM knowledge_base WHERE id = ?
+`
+
+func (q *Queries) DeleteKnowledge(ctx context.Context, id int64) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteKnowledge, id)
+}
+
 const deleteOldNotifications = `-- name: DeleteOldNotifications :execresult
 DELETE FROM notifications WHERE created_at < datetime('now', '-30 days')
 `
@@ -505,6 +693,67 @@ func (q *Queries) GetActiveFilterCategories(ctx context.Context) ([]FilterCatego
 			&i.Description,
 			&i.IsActive,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getActiveKnowledge = `-- name: GetActiveKnowledge :many
+SELECT
+    kb.id, kb.title, kb.content, kb.category, kb.submitted_by, kb.approved_by, kb.is_active, kb.created_at, kb.approved_at,
+    u1.nombre as submitted_by_name,
+    u2.nombre as approved_by_name
+FROM knowledge_base kb
+JOIN users u1 ON kb.submitted_by = u1.id
+LEFT JOIN users u2 ON kb.approved_by = u2.id
+WHERE kb.is_active = 1
+ORDER BY kb.created_at DESC
+`
+
+type GetActiveKnowledgeRow struct {
+	ID              int64          `json:"id"`
+	Title           string         `json:"title"`
+	Content         string         `json:"content"`
+	Category        sql.NullString `json:"category"`
+	SubmittedBy     int64          `json:"submitted_by"`
+	ApprovedBy      sql.NullInt64  `json:"approved_by"`
+	IsActive        sql.NullInt64  `json:"is_active"`
+	CreatedAt       sql.NullTime   `json:"created_at"`
+	ApprovedAt      sql.NullTime   `json:"approved_at"`
+	SubmittedByName string         `json:"submitted_by_name"`
+	ApprovedByName  sql.NullString `json:"approved_by_name"`
+}
+
+func (q *Queries) GetActiveKnowledge(ctx context.Context) ([]GetActiveKnowledgeRow, error) {
+	rows, err := q.db.QueryContext(ctx, getActiveKnowledge)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetActiveKnowledgeRow
+	for rows.Next() {
+		var i GetActiveKnowledgeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Content,
+			&i.Category,
+			&i.SubmittedBy,
+			&i.ApprovedBy,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.ApprovedAt,
+			&i.SubmittedByName,
+			&i.ApprovedByName,
 		); err != nil {
 			return nil, err
 		}
@@ -621,6 +870,128 @@ func (q *Queries) GetAllConfig(ctx context.Context) ([]SystemConfig, error) {
 	return items, nil
 }
 
+const getAllKnowledge = `-- name: GetAllKnowledge :many
+SELECT
+    kb.id, kb.title, kb.content, kb.category, kb.submitted_by, kb.approved_by, kb.is_active, kb.created_at, kb.approved_at,
+    u1.nombre as submitted_by_name,
+    u2.nombre as approved_by_name
+FROM knowledge_base kb
+JOIN users u1 ON kb.submitted_by = u1.id
+LEFT JOIN users u2 ON kb.approved_by = u2.id
+ORDER BY kb.created_at DESC
+`
+
+type GetAllKnowledgeRow struct {
+	ID              int64          `json:"id"`
+	Title           string         `json:"title"`
+	Content         string         `json:"content"`
+	Category        sql.NullString `json:"category"`
+	SubmittedBy     int64          `json:"submitted_by"`
+	ApprovedBy      sql.NullInt64  `json:"approved_by"`
+	IsActive        sql.NullInt64  `json:"is_active"`
+	CreatedAt       sql.NullTime   `json:"created_at"`
+	ApprovedAt      sql.NullTime   `json:"approved_at"`
+	SubmittedByName string         `json:"submitted_by_name"`
+	ApprovedByName  sql.NullString `json:"approved_by_name"`
+}
+
+func (q *Queries) GetAllKnowledge(ctx context.Context) ([]GetAllKnowledgeRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllKnowledge)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllKnowledgeRow
+	for rows.Next() {
+		var i GetAllKnowledgeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Content,
+			&i.Category,
+			&i.SubmittedBy,
+			&i.ApprovedBy,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.ApprovedAt,
+			&i.SubmittedByName,
+			&i.ApprovedByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllQuestions = `-- name: GetAllQuestions :many
+SELECT
+    uq.id, uq.question, uq.asked_by, uq.conversation_id, uq.answer, uq.answered_by, uq.status, uq.add_to_knowledge, uq.created_at, uq.answered_at,
+    u1.nombre as asked_by_name,
+    u2.nombre as answered_by_name
+FROM unanswered_questions uq
+JOIN users u1 ON uq.asked_by = u1.id
+LEFT JOIN users u2 ON uq.answered_by = u2.id
+ORDER BY uq.created_at DESC
+`
+
+type GetAllQuestionsRow struct {
+	ID             int64          `json:"id"`
+	Question       string         `json:"question"`
+	AskedBy        int64          `json:"asked_by"`
+	ConversationID sql.NullInt64  `json:"conversation_id"`
+	Answer         sql.NullString `json:"answer"`
+	AnsweredBy     sql.NullInt64  `json:"answered_by"`
+	Status         sql.NullString `json:"status"`
+	AddToKnowledge sql.NullInt64  `json:"add_to_knowledge"`
+	CreatedAt      sql.NullTime   `json:"created_at"`
+	AnsweredAt     sql.NullTime   `json:"answered_at"`
+	AskedByName    string         `json:"asked_by_name"`
+	AnsweredByName sql.NullString `json:"answered_by_name"`
+}
+
+func (q *Queries) GetAllQuestions(ctx context.Context) ([]GetAllQuestionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllQuestions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllQuestionsRow
+	for rows.Next() {
+		var i GetAllQuestionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Question,
+			&i.AskedBy,
+			&i.ConversationID,
+			&i.Answer,
+			&i.AnsweredBy,
+			&i.Status,
+			&i.AddToKnowledge,
+			&i.CreatedAt,
+			&i.AnsweredAt,
+			&i.AskedByName,
+			&i.AnsweredByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllSecurityFilters = `-- name: GetAllSecurityFilters :many
 SELECT
     sf.id, sf.name, sf.description, sf.filter_type, sf.pattern, sf."action", sf.is_active, sf.applies_to, sf.severity, sf.created_by, sf.created_at, sf.updated_at,
@@ -669,6 +1040,71 @@ func (q *Queries) GetAllSecurityFilters(ctx context.Context) ([]GetAllSecurityFi
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CreatedByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllSubmissions = `-- name: GetAllSubmissions :many
+SELECT
+    ks.id, ks.title, ks.content, ks.category, ks.submitted_by, ks.status, ks.admin_notes, ks.created_at, ks.reviewed_at, ks.reviewed_by,
+    u1.nombre as submitted_by_name,
+    u1.nomina as submitted_by_nomina,
+    u2.nombre as reviewed_by_name
+FROM knowledge_submissions ks
+JOIN users u1 ON ks.submitted_by = u1.id
+LEFT JOIN users u2 ON ks.reviewed_by = u2.id
+ORDER BY ks.created_at DESC
+`
+
+type GetAllSubmissionsRow struct {
+	ID                int64          `json:"id"`
+	Title             string         `json:"title"`
+	Content           string         `json:"content"`
+	Category          sql.NullString `json:"category"`
+	SubmittedBy       int64          `json:"submitted_by"`
+	Status            sql.NullString `json:"status"`
+	AdminNotes        sql.NullString `json:"admin_notes"`
+	CreatedAt         sql.NullTime   `json:"created_at"`
+	ReviewedAt        sql.NullTime   `json:"reviewed_at"`
+	ReviewedBy        sql.NullInt64  `json:"reviewed_by"`
+	SubmittedByName   string         `json:"submitted_by_name"`
+	SubmittedByNomina string         `json:"submitted_by_nomina"`
+	ReviewedByName    sql.NullString `json:"reviewed_by_name"`
+}
+
+func (q *Queries) GetAllSubmissions(ctx context.Context) ([]GetAllSubmissionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllSubmissions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllSubmissionsRow
+	for rows.Next() {
+		var i GetAllSubmissionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Content,
+			&i.Category,
+			&i.SubmittedBy,
+			&i.Status,
+			&i.AdminNotes,
+			&i.CreatedAt,
+			&i.ReviewedAt,
+			&i.ReviewedBy,
+			&i.SubmittedByName,
+			&i.SubmittedByNomina,
+			&i.ReviewedByName,
 		); err != nil {
 			return nil, err
 		}
@@ -1047,6 +1483,243 @@ func (q *Queries) GetGroupMessagesSince(ctx context.Context, id int64) ([]GetGro
 	return items, nil
 }
 
+const getKnowledgeByCategory = `-- name: GetKnowledgeByCategory :many
+SELECT
+    kb.id, kb.title, kb.content, kb.category, kb.submitted_by, kb.approved_by, kb.is_active, kb.created_at, kb.approved_at,
+    u1.nombre as submitted_by_name
+FROM knowledge_base kb
+JOIN users u1 ON kb.submitted_by = u1.id
+WHERE kb.is_active = 1 AND kb.category = ?
+ORDER BY kb.created_at DESC
+`
+
+type GetKnowledgeByCategoryRow struct {
+	ID              int64          `json:"id"`
+	Title           string         `json:"title"`
+	Content         string         `json:"content"`
+	Category        sql.NullString `json:"category"`
+	SubmittedBy     int64          `json:"submitted_by"`
+	ApprovedBy      sql.NullInt64  `json:"approved_by"`
+	IsActive        sql.NullInt64  `json:"is_active"`
+	CreatedAt       sql.NullTime   `json:"created_at"`
+	ApprovedAt      sql.NullTime   `json:"approved_at"`
+	SubmittedByName string         `json:"submitted_by_name"`
+}
+
+func (q *Queries) GetKnowledgeByCategory(ctx context.Context, category sql.NullString) ([]GetKnowledgeByCategoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, getKnowledgeByCategory, category)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetKnowledgeByCategoryRow
+	for rows.Next() {
+		var i GetKnowledgeByCategoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Content,
+			&i.Category,
+			&i.SubmittedBy,
+			&i.ApprovedBy,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.ApprovedAt,
+			&i.SubmittedByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getKnowledgeByID = `-- name: GetKnowledgeByID :one
+SELECT id, title, content, category, submitted_by, approved_by, is_active, created_at, approved_at FROM knowledge_base WHERE id = ?
+`
+
+func (q *Queries) GetKnowledgeByID(ctx context.Context, id int64) (KnowledgeBase, error) {
+	row := q.db.QueryRowContext(ctx, getKnowledgeByID, id)
+	var i KnowledgeBase
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Content,
+		&i.Category,
+		&i.SubmittedBy,
+		&i.ApprovedBy,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.ApprovedAt,
+	)
+	return i, err
+}
+
+const getKnowledgeContext = `-- name: GetKnowledgeContext :many
+SELECT title, content, category FROM knowledge_base
+WHERE is_active = 1
+ORDER BY category, created_at DESC
+`
+
+type GetKnowledgeContextRow struct {
+	Title    string         `json:"title"`
+	Content  string         `json:"content"`
+	Category sql.NullString `json:"category"`
+}
+
+func (q *Queries) GetKnowledgeContext(ctx context.Context) ([]GetKnowledgeContextRow, error) {
+	rows, err := q.db.QueryContext(ctx, getKnowledgeContext)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetKnowledgeContextRow
+	for rows.Next() {
+		var i GetKnowledgeContextRow
+		if err := rows.Scan(&i.Title, &i.Content, &i.Category); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPendingQuestions = `-- name: GetPendingQuestions :many
+SELECT
+    uq.id, uq.question, uq.asked_by, uq.conversation_id, uq.answer, uq.answered_by, uq.status, uq.add_to_knowledge, uq.created_at, uq.answered_at,
+    u.nombre as asked_by_name,
+    u.nomina as asked_by_nomina
+FROM unanswered_questions uq
+JOIN users u ON uq.asked_by = u.id
+WHERE uq.status = 'pending'
+ORDER BY uq.created_at DESC
+`
+
+type GetPendingQuestionsRow struct {
+	ID             int64          `json:"id"`
+	Question       string         `json:"question"`
+	AskedBy        int64          `json:"asked_by"`
+	ConversationID sql.NullInt64  `json:"conversation_id"`
+	Answer         sql.NullString `json:"answer"`
+	AnsweredBy     sql.NullInt64  `json:"answered_by"`
+	Status         sql.NullString `json:"status"`
+	AddToKnowledge sql.NullInt64  `json:"add_to_knowledge"`
+	CreatedAt      sql.NullTime   `json:"created_at"`
+	AnsweredAt     sql.NullTime   `json:"answered_at"`
+	AskedByName    string         `json:"asked_by_name"`
+	AskedByNomina  string         `json:"asked_by_nomina"`
+}
+
+func (q *Queries) GetPendingQuestions(ctx context.Context) ([]GetPendingQuestionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getPendingQuestions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPendingQuestionsRow
+	for rows.Next() {
+		var i GetPendingQuestionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Question,
+			&i.AskedBy,
+			&i.ConversationID,
+			&i.Answer,
+			&i.AnsweredBy,
+			&i.Status,
+			&i.AddToKnowledge,
+			&i.CreatedAt,
+			&i.AnsweredAt,
+			&i.AskedByName,
+			&i.AskedByNomina,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPendingSubmissions = `-- name: GetPendingSubmissions :many
+SELECT
+    ks.id, ks.title, ks.content, ks.category, ks.submitted_by, ks.status, ks.admin_notes, ks.created_at, ks.reviewed_at, ks.reviewed_by,
+    u.nombre as submitted_by_name,
+    u.nomina as submitted_by_nomina
+FROM knowledge_submissions ks
+JOIN users u ON ks.submitted_by = u.id
+WHERE ks.status = 'pending'
+ORDER BY ks.created_at DESC
+`
+
+type GetPendingSubmissionsRow struct {
+	ID                int64          `json:"id"`
+	Title             string         `json:"title"`
+	Content           string         `json:"content"`
+	Category          sql.NullString `json:"category"`
+	SubmittedBy       int64          `json:"submitted_by"`
+	Status            sql.NullString `json:"status"`
+	AdminNotes        sql.NullString `json:"admin_notes"`
+	CreatedAt         sql.NullTime   `json:"created_at"`
+	ReviewedAt        sql.NullTime   `json:"reviewed_at"`
+	ReviewedBy        sql.NullInt64  `json:"reviewed_by"`
+	SubmittedByName   string         `json:"submitted_by_name"`
+	SubmittedByNomina string         `json:"submitted_by_nomina"`
+}
+
+func (q *Queries) GetPendingSubmissions(ctx context.Context) ([]GetPendingSubmissionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getPendingSubmissions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPendingSubmissionsRow
+	for rows.Next() {
+		var i GetPendingSubmissionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Content,
+			&i.Category,
+			&i.SubmittedBy,
+			&i.Status,
+			&i.AdminNotes,
+			&i.CreatedAt,
+			&i.ReviewedAt,
+			&i.ReviewedBy,
+			&i.SubmittedByName,
+			&i.SubmittedByNomina,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPendingUsers = `-- name: GetPendingUsers :many
 SELECT id, nomina, nombre, departamento, created_at
 FROM users
@@ -1089,6 +1762,28 @@ func (q *Queries) GetPendingUsers(ctx context.Context) ([]GetPendingUsersRow, er
 		return nil, err
 	}
 	return items, nil
+}
+
+const getQuestionByID = `-- name: GetQuestionByID :one
+SELECT id, question, asked_by, conversation_id, answer, answered_by, status, add_to_knowledge, created_at, answered_at FROM unanswered_questions WHERE id = ?
+`
+
+func (q *Queries) GetQuestionByID(ctx context.Context, id int64) (UnansweredQuestion, error) {
+	row := q.db.QueryRowContext(ctx, getQuestionByID, id)
+	var i UnansweredQuestion
+	err := row.Scan(
+		&i.ID,
+		&i.Question,
+		&i.AskedBy,
+		&i.ConversationID,
+		&i.Answer,
+		&i.AnsweredBy,
+		&i.Status,
+		&i.AddToKnowledge,
+		&i.CreatedAt,
+		&i.AnsweredAt,
+	)
+	return i, err
 }
 
 const getRecentConversationMessages = `-- name: GetRecentConversationMessages :many
@@ -1564,6 +2259,88 @@ func (q *Queries) GetSessionByToken(ctx context.Context, token string) (GetSessi
 	return i, err
 }
 
+const getSubmissionByID = `-- name: GetSubmissionByID :one
+SELECT
+    ks.id, ks.title, ks.content, ks.category, ks.submitted_by, ks.status, ks.admin_notes, ks.created_at, ks.reviewed_at, ks.reviewed_by,
+    u.nombre as submitted_by_name
+FROM knowledge_submissions ks
+JOIN users u ON ks.submitted_by = u.id
+WHERE ks.id = ?
+`
+
+type GetSubmissionByIDRow struct {
+	ID              int64          `json:"id"`
+	Title           string         `json:"title"`
+	Content         string         `json:"content"`
+	Category        sql.NullString `json:"category"`
+	SubmittedBy     int64          `json:"submitted_by"`
+	Status          sql.NullString `json:"status"`
+	AdminNotes      sql.NullString `json:"admin_notes"`
+	CreatedAt       sql.NullTime   `json:"created_at"`
+	ReviewedAt      sql.NullTime   `json:"reviewed_at"`
+	ReviewedBy      sql.NullInt64  `json:"reviewed_by"`
+	SubmittedByName string         `json:"submitted_by_name"`
+}
+
+func (q *Queries) GetSubmissionByID(ctx context.Context, id int64) (GetSubmissionByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getSubmissionByID, id)
+	var i GetSubmissionByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Content,
+		&i.Category,
+		&i.SubmittedBy,
+		&i.Status,
+		&i.AdminNotes,
+		&i.CreatedAt,
+		&i.ReviewedAt,
+		&i.ReviewedBy,
+		&i.SubmittedByName,
+	)
+	return i, err
+}
+
+const getSubmissionsByUser = `-- name: GetSubmissionsByUser :many
+SELECT id, title, content, category, submitted_by, status, admin_notes, created_at, reviewed_at, reviewed_by FROM knowledge_submissions
+WHERE submitted_by = ?
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetSubmissionsByUser(ctx context.Context, submittedBy int64) ([]KnowledgeSubmission, error) {
+	rows, err := q.db.QueryContext(ctx, getSubmissionsByUser, submittedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []KnowledgeSubmission
+	for rows.Next() {
+		var i KnowledgeSubmission
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Content,
+			&i.Category,
+			&i.SubmittedBy,
+			&i.Status,
+			&i.AdminNotes,
+			&i.CreatedAt,
+			&i.ReviewedAt,
+			&i.ReviewedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUnreadNotifications = `-- name: GetUnreadNotifications :many
 SELECT id, user_id, type, title, message, read, created_at FROM notifications
 WHERE user_id = ? AND read = 0
@@ -1729,6 +2506,21 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 	return items, nil
 }
 
+const ignoreQuestion = `-- name: IgnoreQuestion :execresult
+UPDATE unanswered_questions
+SET status = 'ignored', answered_by = ?, answered_at = datetime('now')
+WHERE id = ? AND status = 'pending'
+`
+
+type IgnoreQuestionParams struct {
+	AnsweredBy sql.NullInt64 `json:"answered_by"`
+	ID         int64         `json:"id"`
+}
+
+func (q *Queries) IgnoreQuestion(ctx context.Context, arg IgnoreQuestionParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, ignoreQuestion, arg.AnsweredBy, arg.ID)
+}
+
 const markAllNotificationsRead = `-- name: MarkAllNotificationsRead :execresult
 UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0
 `
@@ -1748,6 +2540,22 @@ type MarkNotificationReadParams struct {
 
 func (q *Queries) MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, markNotificationRead, arg.ID, arg.UserID)
+}
+
+const rejectSubmission = `-- name: RejectSubmission :execresult
+UPDATE knowledge_submissions
+SET status = 'rejected', reviewed_at = datetime('now'), reviewed_by = ?, admin_notes = ?
+WHERE id = ? AND status = 'pending'
+`
+
+type RejectSubmissionParams struct {
+	ReviewedBy sql.NullInt64  `json:"reviewed_by"`
+	AdminNotes sql.NullString `json:"admin_notes"`
+	ID         int64          `json:"id"`
+}
+
+func (q *Queries) RejectSubmission(ctx context.Context, arg RejectSubmissionParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, rejectSubmission, arg.ReviewedBy, arg.AdminNotes, arg.ID)
 }
 
 const rejectUser = `-- name: RejectUser :execresult
@@ -1829,6 +2637,30 @@ func (q *Queries) UpdateFilterCategory(ctx context.Context, arg UpdateFilterCate
 	return q.db.ExecContext(ctx, updateFilterCategory, arg.Description, arg.IsActive, arg.ID)
 }
 
+const updateKnowledge = `-- name: UpdateKnowledge :execresult
+UPDATE knowledge_base
+SET title = ?, content = ?, category = ?, is_active = ?
+WHERE id = ?
+`
+
+type UpdateKnowledgeParams struct {
+	Title    string         `json:"title"`
+	Content  string         `json:"content"`
+	Category sql.NullString `json:"category"`
+	IsActive sql.NullInt64  `json:"is_active"`
+	ID       int64          `json:"id"`
+}
+
+func (q *Queries) UpdateKnowledge(ctx context.Context, arg UpdateKnowledgeParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateKnowledge,
+		arg.Title,
+		arg.Content,
+		arg.Category,
+		arg.IsActive,
+		arg.ID,
+	)
+}
+
 const updateSecurityFilter = `-- name: UpdateSecurityFilter :execresult
 UPDATE security_filters
 SET name = ?, description = ?, pattern = ?, action = ?, applies_to = ?, severity = ?, is_active = ?, updated_at = datetime('now')
@@ -1870,4 +2702,20 @@ type UpdateUserDepartamentoParams struct {
 
 func (q *Queries) UpdateUserDepartamento(ctx context.Context, arg UpdateUserDepartamentoParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateUserDepartamento, arg.Departamento, arg.ID)
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :execresult
+
+UPDATE users SET password_hash = ?, updated_at = datetime('now')
+WHERE id = ?
+`
+
+type UpdateUserPasswordParams struct {
+	PasswordHash string `json:"password_hash"`
+	ID           int64  `json:"id"`
+}
+
+// ============ PASSWORD CHANGE ============
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateUserPassword, arg.PasswordHash, arg.ID)
 }

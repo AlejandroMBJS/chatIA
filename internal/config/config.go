@@ -25,8 +25,8 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		Port:              getEnv("PORT", "9999"),
-		DBPath:            getEnv("DB_PATH", "/data/chat.db"),
-		OllamaURL:         getEnv("OLLAMA_URL", "http://host.docker.internal:11434"),
+		DBPath:            getEnv("DB_PATH", "./chat.db"),
+		OllamaURL:         getEnv("OLLAMA_URL", "http://localhost:11434"),
 		OllamaModel:       getEnv("OLLAMA_MODEL", "deepseek-r1:14b"),
 		SessionDuration:   getDurationEnv("SESSION_DURATION", 24*time.Hour),
 		MaxContextMsgs:    getIntEnv("MAX_CONTEXT_MESSAGES", 20),

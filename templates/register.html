@@ -1,58 +1,79 @@
-{{define "content"}}
-<div class="auth-container">
-    <div class="auth-card">
-        <div class="auth-header">
-            <h1>Registro</h1>
-            <p>Crea tu cuenta de empleado</p>
-        </div>
-
-        {{if .Error}}
-        <div class="alert alert-error">
-            {{.Error}}
-        </div>
-        {{end}}
-
-        <form action="/register" method="POST" class="auth-form">
-            <div class="form-group">
-                <label for="nomina">Numero de Nomina</label>
-                <input type="text" id="nomina" name="nomina" required
-                       placeholder="Tu numero de nomina" autocomplete="username">
-            </div>
-
-            <div class="form-group">
-                <label for="nombre">Nombre Completo</label>
-                <input type="text" id="nombre" name="nombre" required
-                       placeholder="Tu nombre completo">
-            </div>
-
-            <div class="form-group">
-                <label for="departamento">Departamento</label>
-                <input type="text" id="departamento" name="departamento"
-                       placeholder="Tu departamento (opcional)">
-            </div>
-
-            <div class="form-group">
-                <label for="password">Contrasena</label>
-                <input type="password" id="password" name="password" required
-                       placeholder="Minimo 6 caracteres" autocomplete="new-password">
-            </div>
-
-            <div class="form-group">
-                <label for="password_confirm">Confirmar Contrasena</label>
-                <input type="password" id="password_confirm" name="password_confirm" required
-                       placeholder="Repite tu contrasena" autocomplete="new-password">
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-block">
-                Registrarse
-            </button>
-        </form>
-
-        <div class="auth-footer">
-            <p>Ya tienes cuenta? <a href="/login">Inicia sesion aqui</a></p>
-        </div>
+{{define "register"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="lang-selector-guest">
+        <a href="/set-language?lang=es" class="lang-btn {{if eq .Lang "es"}}active{{end}}" title="Espanol">ES</a>
+        <a href="/set-language?lang=en" class="lang-btn {{if eq .Lang "en"}}active{{end}}" title="English">EN</a>
     </div>
-</div>
-{{end}}
 
-{{template "base" .}}
+    <main class="container">
+        <div class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <img src="/static/logo.svg" alt="AQUILA" class="auth-logo">
+                    <h1>AQUILA</h1>
+                    <p>{{if eq .Lang "en"}}Create your employee account{{else}}Crea tu cuenta de empleado{{end}}</p>
+                </div>
+
+                {{if .Error}}
+                <div class="alert alert-error">
+                    {{.Error}}
+                </div>
+                {{end}}
+
+                <form action="/register" method="POST" class="auth-form">
+                    <div class="form-group">
+                        <label for="nomina">{{if .T}}{{index .T "nomina"}}{{else}}Numero de Nomina{{end}}</label>
+                        <input type="text" id="nomina" name="nomina" required
+                               placeholder="{{if eq .Lang "en"}}Your employee ID{{else}}Tu numero de nomina{{end}}" autocomplete="username">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="nombre">{{if eq .Lang "en"}}Full Name{{else}}Nombre Completo{{end}}</label>
+                        <input type="text" id="nombre" name="nombre" required
+                               placeholder="{{if eq .Lang "en"}}Your full name{{else}}Tu nombre completo{{end}}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="departamento">{{if eq .Lang "en"}}Department{{else}}Departamento{{end}}</label>
+                        <input type="text" id="departamento" name="departamento"
+                               placeholder="{{if eq .Lang "en"}}Your department (optional){{else}}Tu departamento (opcional){{end}}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">{{if .T}}{{index .T "password"}}{{else}}Contrasena{{end}}</label>
+                        <input type="password" id="password" name="password" required
+                               placeholder="{{if eq .Lang "en"}}Minimum 6 characters{{else}}Minimo 6 caracteres{{end}}" autocomplete="new-password">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password_confirm">{{if eq .Lang "en"}}Confirm Password{{else}}Confirmar Contrasena{{end}}</label>
+                        <input type="password" id="password_confirm" name="password_confirm" required
+                               placeholder="{{if eq .Lang "en"}}Repeat your password{{else}}Repite tu contrasena{{end}}" autocomplete="new-password">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">
+                        {{if eq .Lang "en"}}Register{{else}}Registrarse{{end}}
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>{{if eq .Lang "en"}}Already have an account?{{else}}Ya tienes cuenta?{{end}} <a href="/login">{{if eq .Lang "en"}}Login here{{else}}Inicia sesion aqui{{end}}</a></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+</body>
+</html>
+{{end}}

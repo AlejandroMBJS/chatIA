@@ -1,0 +1,189 @@
+{{define "knowledge"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+    .knowledge-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+    .knowledge-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .knowledge-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+    }
+    @media (max-width: 768px) {
+        .knowledge-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .knowledge-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .knowledge-item {
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+    }
+    .knowledge-item h3 {
+        margin: 0 0 0.5rem 0;
+        color: var(--primary);
+    }
+    .knowledge-item .category {
+        display: inline-block;
+        background: var(--primary-light);
+        color: var(--primary);
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+        margin-bottom: 0.5rem;
+    }
+    .knowledge-item .content {
+        color: var(--text);
+        white-space: pre-wrap;
+        line-height: 1.6;
+    }
+    .knowledge-item .meta {
+        margin-top: 1rem;
+        font-size: 0.85rem;
+        color: var(--text-light);
+    }
+    .submission-form {
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+    }
+    .submission-form h3 {
+        margin-top: 0;
+    }
+    .my-submissions {
+        margin-top: 1.5rem;
+    }
+    .submission-status {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+    }
+    .status-pending {
+        background: var(--warning-light);
+        color: var(--warning);
+    }
+    .status-approved {
+        background: var(--success-light);
+        color: var(--success);
+    }
+    .status-rejected {
+        background: var(--danger-light);
+        color: var(--danger);
+    }
+    </style>
+</head>
+<body>
+    {{template "navbar" .}}
+
+    <main class="container">
+        <div class="knowledge-container">
+            <div class="knowledge-header">
+                <h1>{{if eq .Lang "en"}}Company Knowledge Base{{else}}Base de Conocimiento Empresarial{{end}}</h1>
+                {{if .User.IsAdmin}}
+                <a href="/admin/knowledge" class="btn btn-primary">
+                    {{if eq .Lang "en"}}Review Submissions{{else}}Revisar Envios{{end}}
+                    {{if .PendingCount}}<span class="badge">{{.PendingCount}}</span>{{end}}
+                </a>
+                {{end}}
+            </div>
+
+            <div class="knowledge-grid">
+                <div>
+                    <h2>{{if eq .Lang "en"}}Available Knowledge{{else}}Conocimiento Disponible{{end}}</h2>
+                    <div class="knowledge-list">
+                        {{range .Knowledge}}
+                        <div class="knowledge-item">
+                            <span class="category">{{.Category.String}}</span>
+                            <h3>{{.Title}}</h3>
+                            <div class="content">{{.Content}}</div>
+                            <div class="meta">
+                                {{if eq $.Lang "en"}}Submitted by{{else}}Enviado por{{end}}: {{.SubmittedByName}}
+                            </div>
+                        </div>
+                        {{else}}
+                        <div class="knowledge-item">
+                            <p>{{if eq .Lang "en"}}No knowledge available yet.{{else}}Aun no hay conocimiento disponible.{{end}}</p>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="submission-form">
+                        <h3>{{if .User.IsAdmin}}{{if eq .Lang "en"}}Add Knowledge{{else}}Agregar Conocimiento{{end}}{{else}}{{if eq .Lang "en"}}Submit Knowledge{{else}}Enviar Conocimiento{{end}}{{end}}</h3>
+                        <p>{{if .User.IsAdmin}}{{if eq .Lang "en"}}Add information directly to the knowledge base.{{else}}Agrega informacion directamente a la base de conocimiento.{{end}}{{else}}{{if eq .Lang "en"}}Share company information that others might find useful. Your submission will be reviewed by an administrator.{{else}}Comparte informacion de la empresa que pueda ser util para otros. Tu envio sera revisado por un administrador.{{end}}{{end}}</p>
+
+                        <form hx-post="/knowledge/submit" hx-swap="none">
+                            <div class="form-group">
+                                <label>{{if eq .Lang "en"}}Title{{else}}Titulo{{end}}</label>
+                                <input type="text" name="title" required placeholder="{{if eq .Lang "en"}}e.g. Work Schedule Policy{{else}}ej. Politica de Horarios{{end}}">
+                            </div>
+                            <div class="form-group">
+                                <label>{{if eq .Lang "en"}}Category{{else}}Categoria{{end}}</label>
+                                <select name="category">
+                                    <option value="general">General</option>
+                                    <option value="politicas">{{if eq .Lang "en"}}Policies{{else}}Politicas{{end}}</option>
+                                    <option value="procesos">{{if eq .Lang "en"}}Processes{{else}}Procesos{{end}}</option>
+                                    <option value="rrhh">{{if eq .Lang "en"}}HR{{else}}RRHH{{end}}</option>
+                                    <option value="tecnologia">{{if eq .Lang "en"}}Technology{{else}}Tecnologia{{end}}</option>
+                                    <option value="produccion">{{if eq .Lang "en"}}Production{{else}}Produccion{{end}}</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>{{if eq .Lang "en"}}Content{{else}}Contenido{{end}}</label>
+                                <textarea name="content" rows="6" required placeholder="{{if eq .Lang "en"}}Describe the information in detail...{{else}}Describe la informacion en detalle...{{end}}"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">{{if .User.IsAdmin}}{{if eq .Lang "en"}}Add to Knowledge Base{{else}}Agregar a Base de Conocimiento{{end}}{{else}}{{if eq .Lang "en"}}Submit for Review{{else}}Enviar para Revision{{end}}{{end}}</button>
+                        </form>
+                    </div>
+
+                    {{if .Submissions}}
+                    <div class="my-submissions">
+                        <h3>{{if eq .Lang "en"}}My Submissions{{else}}Mis Envios{{end}}</h3>
+                        {{range .Submissions}}
+                        <div class="knowledge-item" style="padding: 1rem; margin-bottom: 0.5rem;">
+                            <strong>{{.Title}}</strong>
+                            <span class="submission-status status-{{.Status.String}}">{{.Status.String}}</span>
+                            {{if .AdminNotes.String}}
+                            <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 0.5rem;">
+                                {{if eq $.Lang "en"}}Admin notes{{else}}Notas del admin{{end}}: {{.AdminNotes.String}}
+                            </p>
+                            {{end}}
+                        </div>
+                        {{end}}
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+</body>
+</html>
+{{end}}

@@ -10,10 +10,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"chat-empleados/db"
 	"chat-empleados/internal/config"
 	"chat-empleados/internal/handlers"
+	"chat-empleados/internal/i18n"
 	"chat-empleados/internal/middleware"
 	"chat-empleados/internal/services"
 
@@ -48,9 +50,11 @@ func main() {
 
 	authMiddleware := middleware.NewAuthMiddleware(queries)
 	authHandler := handlers.NewAuthHandler(queries, cfg, templates, notificationService)
-	chatHandler := handlers.NewChatHandler(queries, templates, securityService)
+	// chatHandler deshabilitado temporalmente
+	// chatHandler := handlers.NewChatHandler(queries, templates, securityService)
 	aiHandler := handlers.NewAIHandler(queries, templates, ollamaService, securityService)
 	adminHandler := handlers.NewAdminHandler(queries, templates, securityService, notificationService)
+	knowledgeHandler := handlers.NewKnowledgeHandler(queries, templates, notificationService)
 
 	mux := http.NewServeMux()
 
@@ -68,13 +72,45 @@ func main() {
 	mux.Handle("POST /register", middleware.AuthRateLimit(http.HandlerFunc(authHandler.Register)))
 	mux.HandleFunc("POST /logout", authHandler.Logout)
 	mux.HandleFunc("GET /pending", authHandler.PendingPage)
+	mux.HandleFunc("POST /request-approval", authHandler.RequestApproval)
+
+	// Cambio de idioma
+	mux.HandleFunc("POST /set-language", func(w http.ResponseWriter, r *http.Request) {
+		lang := r.FormValue("lang")
+		if lang == "en" {
+			i18n.SetLanguageCookie(w, i18n.English)
+		} else {
+			i18n.SetLanguageCookie(w, i18n.Spanish)
+		}
+		// Redirigir a la pagina anterior o al inicio
+		referer := r.Header.Get("Referer")
+		if referer == "" {
+			referer = "/"
+		}
+		http.Redirect(w, r, referer, http.StatusSeeOther)
+	})
+	mux.HandleFunc("GET /set-language", func(w http.ResponseWriter, r *http.Request) {
+		lang := r.URL.Query().Get("lang")
+		if lang == "en" {
+			i18n.SetLanguageCookie(w, i18n.English)
+		} else {
+			i18n.SetLanguageCookie(w, i18n.Spanish)
+		}
+		referer := r.Header.Get("Referer")
+		if referer == "" {
+			referer = "/"
+		}
+		http.Redirect(w, r, referer, http.StatusSeeOther)
+	})
 
 	mux.Handle("GET /", authMiddleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/chat", http.StatusSeeOther)
+		http.Redirect(w, r, "/ai", http.StatusSeeOther)
 	})))
 
-	mux.Handle("GET /chat", authMiddleware.RequireAuth(http.HandlerFunc(chatHandler.ChatPage)))
-	mux.Handle("GET /chat/ws", authMiddleware.RequireAuth(http.HandlerFunc(chatHandler.WebSocket)))
+	// Chat grupal deshabilitado temporalmente - redirigir a IA
+	mux.Handle("GET /chat", authMiddleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/ai", http.StatusSeeOther)
+	})))
 
 	mux.Handle("GET /ai", authMiddleware.RequireAuth(http.HandlerFunc(aiHandler.AIPage)))
 	mux.Handle("GET /ai/new", authMiddleware.RequireAuth(http.HandlerFunc(aiHandler.NewConversation)))
@@ -85,6 +121,7 @@ func main() {
 	mux.Handle("GET /ai/health", http.HandlerFunc(aiHandler.HealthCheck))
 
 	mux.Handle("GET /profile", authMiddleware.RequireAuth(http.HandlerFunc(authHandler.Profile)))
+	mux.Handle("POST /profile/password", authMiddleware.RequireAuth(http.HandlerFunc(authHandler.ChangePassword)))
 
 	mux.Handle("GET /admin", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.Dashboard)))
 	mux.Handle("GET /admin/users", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.Users)))
@@ -96,12 +133,23 @@ func main() {
 	mux.Handle("DELETE /admin/filters/delete/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.DeleteFilter)))
 	mux.Handle("GET /admin/logs", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.SecurityLogs)))
 	mux.Handle("GET /admin/stats", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.GetStats)))
+	mux.Handle("POST /admin/user/{id}/password", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.AdminChangePassword)))
 
-	handler := middleware.Logging(middleware.RateLimit(middleware.SecurityHeaders(mux)))
+	// Knowledge Base routes
+	mux.Handle("GET /knowledge", authMiddleware.RequireAuth(http.HandlerFunc(knowledgeHandler.KnowledgePage)))
+	mux.Handle("POST /knowledge/submit", authMiddleware.RequireAuth(http.HandlerFunc(knowledgeHandler.SubmitKnowledge)))
+	mux.Handle("GET /admin/knowledge", authMiddleware.RequireAdmin(http.HandlerFunc(knowledgeHandler.AdminKnowledgePage)))
+	mux.Handle("POST /admin/knowledge/approve/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(knowledgeHandler.ApproveSubmission)))
+	mux.Handle("POST /admin/knowledge/reject/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(knowledgeHandler.RejectSubmission)))
+	mux.Handle("POST /admin/knowledge/question/{id}/answer", authMiddleware.RequireAdmin(http.HandlerFunc(knowledgeHandler.AnswerQuestion)))
+	mux.Handle("POST /admin/knowledge/question/{id}/ignore", authMiddleware.RequireAdmin(http.HandlerFunc(knowledgeHandler.IgnoreQuestion)))
+	mux.Handle("DELETE /admin/knowledge/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(knowledgeHandler.DeleteKnowledge)))
+
+	handler := middleware.Logging(middleware.LanguageMiddleware(middleware.RateLimit(middleware.SecurityHeaders(mux))))
 
 	addr := ":" + cfg.Port
 	log.Printf("[INFO] ========================================")
-	log.Printf("[INFO] GIA Chat - Sistema de Comunicacion")
+	log.Printf("[INFO] AQUILA - IRIS IA Chat")
 	log.Printf("[INFO] ========================================")
 	log.Printf("[INFO] Servidor iniciando en puerto %s", cfg.Port)
 	log.Printf("[INFO] Base de datos: %s", cfg.DBPath)
@@ -158,5 +206,33 @@ func initDB(dbPath string) (*sql.DB, error) {
 }
 
 func loadTemplates() (*template.Template, error) {
-	return template.ParseFS(templatesFS, "templates/*.html")
+	funcMap := template.FuncMap{
+		"formatDate": func(t interface{}) string {
+			switch v := t.(type) {
+			case sql.NullTime:
+				if v.Valid {
+					return v.Time.Format("02/01/2006 15:04")
+				}
+				return ""
+			case time.Time:
+				return v.Format("02/01/2006 15:04")
+			default:
+				return ""
+			}
+		},
+		"formatDateShort": func(t interface{}) string {
+			switch v := t.(type) {
+			case sql.NullTime:
+				if v.Valid {
+					return v.Time.Format("02/01/06")
+				}
+				return ""
+			case time.Time:
+				return v.Format("02/01/06")
+			default:
+				return ""
+			}
+		},
+	}
+	return template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/*.html")
 }

@@ -348,3 +348,162 @@ SELECT
     (SELECT COUNT(*) FROM ai_messages) as total_ai_messages,
     (SELECT COUNT(*) FROM group_messages) as total_group_messages,
     (SELECT COUNT(*) FROM security_logs WHERE date(created_at) = date('now')) as security_incidents_today;
+
+-- ============ PASSWORD CHANGE ============
+
+-- name: UpdateUserPassword :execresult
+UPDATE users SET password_hash = ?, updated_at = datetime('now')
+WHERE id = ?;
+
+-- ============ KNOWLEDGE BASE ============
+
+-- name: CreateKnowledge :one
+INSERT INTO knowledge_base (title, content, category, submitted_by, approved_by, is_active, approved_at)
+VALUES (?, ?, ?, ?, ?, 1, datetime('now'))
+RETURNING *;
+
+-- name: GetActiveKnowledge :many
+SELECT
+    kb.*,
+    u1.nombre as submitted_by_name,
+    u2.nombre as approved_by_name
+FROM knowledge_base kb
+JOIN users u1 ON kb.submitted_by = u1.id
+LEFT JOIN users u2 ON kb.approved_by = u2.id
+WHERE kb.is_active = 1
+ORDER BY kb.created_at DESC;
+
+-- name: GetAllKnowledge :many
+SELECT
+    kb.*,
+    u1.nombre as submitted_by_name,
+    u2.nombre as approved_by_name
+FROM knowledge_base kb
+JOIN users u1 ON kb.submitted_by = u1.id
+LEFT JOIN users u2 ON kb.approved_by = u2.id
+ORDER BY kb.created_at DESC;
+
+-- name: GetKnowledgeByCategory :many
+SELECT
+    kb.*,
+    u1.nombre as submitted_by_name
+FROM knowledge_base kb
+JOIN users u1 ON kb.submitted_by = u1.id
+WHERE kb.is_active = 1 AND kb.category = ?
+ORDER BY kb.created_at DESC;
+
+-- name: GetKnowledgeByID :one
+SELECT * FROM knowledge_base WHERE id = ?;
+
+-- name: UpdateKnowledge :execresult
+UPDATE knowledge_base
+SET title = ?, content = ?, category = ?, is_active = ?
+WHERE id = ?;
+
+-- name: DeleteKnowledge :execresult
+DELETE FROM knowledge_base WHERE id = ?;
+
+-- name: CountActiveKnowledge :one
+SELECT COUNT(*) as count FROM knowledge_base WHERE is_active = 1;
+
+-- ============ KNOWLEDGE SUBMISSIONS ============
+
+-- name: CreateKnowledgeSubmission :one
+INSERT INTO knowledge_submissions (title, content, category, submitted_by)
+VALUES (?, ?, ?, ?)
+RETURNING *;
+
+-- name: GetPendingSubmissions :many
+SELECT
+    ks.*,
+    u.nombre as submitted_by_name,
+    u.nomina as submitted_by_nomina
+FROM knowledge_submissions ks
+JOIN users u ON ks.submitted_by = u.id
+WHERE ks.status = 'pending'
+ORDER BY ks.created_at DESC;
+
+-- name: GetAllSubmissions :many
+SELECT
+    ks.*,
+    u1.nombre as submitted_by_name,
+    u1.nomina as submitted_by_nomina,
+    u2.nombre as reviewed_by_name
+FROM knowledge_submissions ks
+JOIN users u1 ON ks.submitted_by = u1.id
+LEFT JOIN users u2 ON ks.reviewed_by = u2.id
+ORDER BY ks.created_at DESC;
+
+-- name: GetSubmissionsByUser :many
+SELECT * FROM knowledge_submissions
+WHERE submitted_by = ?
+ORDER BY created_at DESC;
+
+-- name: GetSubmissionByID :one
+SELECT
+    ks.*,
+    u.nombre as submitted_by_name
+FROM knowledge_submissions ks
+JOIN users u ON ks.submitted_by = u.id
+WHERE ks.id = ?;
+
+-- name: ApproveSubmission :execresult
+UPDATE knowledge_submissions
+SET status = 'approved', reviewed_at = datetime('now'), reviewed_by = ?, admin_notes = ?
+WHERE id = ? AND status = 'pending';
+
+-- name: RejectSubmission :execresult
+UPDATE knowledge_submissions
+SET status = 'rejected', reviewed_at = datetime('now'), reviewed_by = ?, admin_notes = ?
+WHERE id = ? AND status = 'pending';
+
+-- name: CountPendingSubmissions :one
+SELECT COUNT(*) as count FROM knowledge_submissions WHERE status = 'pending';
+
+-- ============ UNANSWERED QUESTIONS ============
+
+-- name: CreateUnansweredQuestion :one
+INSERT INTO unanswered_questions (question, asked_by, conversation_id)
+VALUES (?, ?, ?)
+RETURNING *;
+
+-- name: GetPendingQuestions :many
+SELECT
+    uq.*,
+    u.nombre as asked_by_name,
+    u.nomina as asked_by_nomina
+FROM unanswered_questions uq
+JOIN users u ON uq.asked_by = u.id
+WHERE uq.status = 'pending'
+ORDER BY uq.created_at DESC;
+
+-- name: GetAllQuestions :many
+SELECT
+    uq.*,
+    u1.nombre as asked_by_name,
+    u2.nombre as answered_by_name
+FROM unanswered_questions uq
+JOIN users u1 ON uq.asked_by = u1.id
+LEFT JOIN users u2 ON uq.answered_by = u2.id
+ORDER BY uq.created_at DESC;
+
+-- name: GetQuestionByID :one
+SELECT * FROM unanswered_questions WHERE id = ?;
+
+-- name: AnswerQuestion :execresult
+UPDATE unanswered_questions
+SET answer = ?, answered_by = ?, status = 'answered', answered_at = datetime('now'), add_to_knowledge = ?
+WHERE id = ? AND status = 'pending';
+
+-- name: IgnoreQuestion :execresult
+UPDATE unanswered_questions
+SET status = 'ignored', answered_by = ?, answered_at = datetime('now')
+WHERE id = ? AND status = 'pending';
+
+-- name: CountPendingQuestions :one
+SELECT COUNT(*) as count FROM unanswered_questions WHERE status = 'pending';
+
+-- name: GetKnowledgeContext :many
+SELECT title, content, category FROM knowledge_base
+WHERE is_active = 1
+ORDER BY category, created_at DESC;

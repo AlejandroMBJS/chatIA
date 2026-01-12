@@ -46,12 +46,12 @@ func (h *ChatHandler) ChatPage(w http.ResponseWriter, r *http.Request) {
 		messages[i], messages[j] = messages[j], messages[i]
 	}
 
-	data := map[string]interface{}{
-		"Title":    "Chat Grupal",
+	data := TemplateData(r, map[string]interface{}{
+		"Title":    Tr(r, "group_chat"),
 		"User":     user,
 		"Messages": messages,
-	}
-	h.templates.ExecuteTemplate(w, "chat.html", data)
+	})
+	h.templates.ExecuteTemplate(w, "chat", data)
 }
 
 var upgrader = websocket.Upgrader{

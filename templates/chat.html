@@ -1,137 +1,155 @@
-{{define "content"}}
-<div class="chat-container">
-    <div class="chat-header">
-        <h2>Chat Grupal</h2>
-        <span id="online-status" class="online-indicator">Conectando...</span>
-    </div>
+{{define "chat"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    {{template "navbar" .}}
 
-    <div id="chat-messages" class="chat-messages">
-        {{range .Messages}}
-        <div class="message {{if eq .UserID $.User.ID}}message-own{{end}}">
-            <div class="message-header">
-                <span class="message-author">{{.Nombre}}</span>
-                <span class="message-time">{{.CreatedAt}}</span>
+    <main class="container">
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2>{{if .T}}{{index .T "group_chat"}}{{else}}Chat Grupal{{end}}</h2>
+                <span id="online-status" class="online-indicator">{{if eq .Lang "en"}}Connecting...{{else}}Conectando...{{end}}</span>
             </div>
-            <div class="message-content">{{.Content}}</div>
-        </div>
-        {{end}}
-    </div>
 
-    <div id="error-container" class="error-container" style="display: none;"></div>
-
-    <form id="chat-form" class="chat-input-form">
-        <input type="text" id="message-input" name="content"
-               placeholder="Escribe un mensaje..."
-               autocomplete="off" maxlength="2000">
-        <button type="submit" class="btn btn-primary">Enviar</button>
-    </form>
-</div>
-
-<script>
-(function() {
-    const messagesContainer = document.getElementById('chat-messages');
-    const messageInput = document.getElementById('message-input');
-    const chatForm = document.getElementById('chat-form');
-    const onlineStatus = document.getElementById('online-status');
-    const errorContainer = document.getElementById('error-container');
-
-    let ws;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
-
-    function connect() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${window.location.host}/chat/ws`);
-
-        ws.onopen = function() {
-            onlineStatus.textContent = 'Conectado';
-            onlineStatus.className = 'online-indicator connected';
-            reconnectAttempts = 0;
-            hideError();
-        };
-
-        ws.onclose = function() {
-            onlineStatus.textContent = 'Desconectado';
-            onlineStatus.className = 'online-indicator disconnected';
-
-            if (reconnectAttempts < maxReconnectAttempts) {
-                reconnectAttempts++;
-                setTimeout(connect, 2000 * reconnectAttempts);
-            } else {
-                showError('Conexion perdida. Recarga la pagina para reconectar.');
-            }
-        };
-
-        ws.onerror = function() {
-            onlineStatus.textContent = 'Error';
-            onlineStatus.className = 'online-indicator error';
-        };
-
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-
-            if (data.type === 'error') {
-                showError(data.content);
-                return;
-            }
-
-            const messageDiv = document.createElement('div');
-
-            if (data.type === 'system') {
-                messageDiv.className = 'message message-system';
-                messageDiv.innerHTML = `<div class="message-content">${escapeHtml(data.content)}</div>`;
-            } else {
-                const isOwn = data.user_id === {{.User.ID}};
-                messageDiv.className = `message ${isOwn ? 'message-own' : ''}`;
-                messageDiv.innerHTML = `
+            <div id="chat-messages" class="chat-messages">
+                {{range .Messages}}
+                <div class="message {{if eq .UserID $.User.ID}}message-own{{end}}">
                     <div class="message-header">
-                        <span class="message-author">${escapeHtml(data.nombre)}</span>
-                        <span class="message-time">${data.timestamp}</span>
+                        <span class="message-author">{{.Nombre}}</span>
+                        <span class="message-time">{{.CreatedAt}}</span>
                     </div>
-                    <div class="message-content">${escapeHtml(data.content)}</div>
-                `;
-            }
+                    <div class="message-content">{{.Content}}</div>
+                </div>
+                {{end}}
+            </div>
 
-            messagesContainer.appendChild(messageDiv);
-            scrollToBottom();
-        };
-    }
+            <div id="error-container" class="error-container" style="display: none;"></div>
 
-    chatForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const content = messageInput.value.trim();
+            <form id="chat-form" class="chat-input-form">
+                <input type="text" id="message-input" name="content"
+                       placeholder="{{if eq .Lang "en"}}Write a message...{{else}}Escribe un mensaje...{{end}}"
+                       autocomplete="off" maxlength="2000">
+                <button type="submit" class="btn btn-primary">{{if eq .Lang "en"}}Send{{else}}Enviar{{end}}</button>
+            </form>
+        </div>
+    </main>
 
-        if (content && ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ content: content }));
-            messageInput.value = '';
-            hideError();
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+
+    <script>
+    (function() {
+        const messagesContainer = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const chatForm = document.getElementById('chat-form');
+        const onlineStatus = document.getElementById('online-status');
+        const errorContainer = document.getElementById('error-container');
+        const lang = '{{.Lang}}';
+
+        let ws;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/chat/ws`);
+
+            ws.onopen = function() {
+                onlineStatus.textContent = lang === 'en' ? 'Connected' : 'Conectado';
+                onlineStatus.className = 'online-indicator connected';
+                reconnectAttempts = 0;
+                hideError();
+            };
+
+            ws.onclose = function() {
+                onlineStatus.textContent = lang === 'en' ? 'Disconnected' : 'Desconectado';
+                onlineStatus.className = 'online-indicator disconnected';
+
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    setTimeout(connect, 2000 * reconnectAttempts);
+                } else {
+                    showError(lang === 'en' ? 'Connection lost. Reload the page to reconnect.' : 'Conexion perdida. Recarga la pagina para reconectar.');
+                }
+            };
+
+            ws.onerror = function() {
+                onlineStatus.textContent = 'Error';
+                onlineStatus.className = 'online-indicator error';
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'error') {
+                    showError(data.content);
+                    return;
+                }
+
+                const messageDiv = document.createElement('div');
+
+                if (data.type === 'system') {
+                    messageDiv.className = 'message message-system';
+                    messageDiv.innerHTML = `<div class="message-content">${escapeHtml(data.content)}</div>`;
+                } else {
+                    const isOwn = data.user_id === {{.User.ID}};
+                    messageDiv.className = `message ${isOwn ? 'message-own' : ''}`;
+                    messageDiv.innerHTML = `
+                        <div class="message-header">
+                            <span class="message-author">${escapeHtml(data.nombre)}</span>
+                            <span class="message-time">${data.timestamp}</span>
+                        </div>
+                        <div class="message-content">${escapeHtml(data.content)}</div>
+                    `;
+                }
+
+                messagesContainer.appendChild(messageDiv);
+                scrollToBottom();
+            };
         }
-    });
 
-    function scrollToBottom() {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const content = messageInput.value.trim();
 
-    function showError(message) {
-        errorContainer.textContent = message;
-        errorContainer.style.display = 'block';
-        setTimeout(hideError, 5000);
-    }
+            if (content && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ content: content }));
+                messageInput.value = '';
+                hideError();
+            }
+        });
 
-    function hideError() {
-        errorContainer.style.display = 'none';
-    }
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+        function showError(message) {
+            errorContainer.textContent = message;
+            errorContainer.style.display = 'block';
+            setTimeout(hideError, 5000);
+        }
 
-    connect();
-    scrollToBottom();
-})();
-</script>
+        function hideError() {
+            errorContainer.style.display = 'none';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        connect();
+        scrollToBottom();
+    })();
+    </script>
+</body>
+</html>
 {{end}}
-
-{{template "base" .}}

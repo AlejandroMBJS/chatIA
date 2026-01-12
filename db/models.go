@@ -42,6 +42,31 @@ type GroupMessage struct {
 	CreatedAt sql.NullTime `json:"created_at"`
 }
 
+type KnowledgeBase struct {
+	ID          int64          `json:"id"`
+	Title       string         `json:"title"`
+	Content     string         `json:"content"`
+	Category    sql.NullString `json:"category"`
+	SubmittedBy int64          `json:"submitted_by"`
+	ApprovedBy  sql.NullInt64  `json:"approved_by"`
+	IsActive    sql.NullInt64  `json:"is_active"`
+	CreatedAt   sql.NullTime   `json:"created_at"`
+	ApprovedAt  sql.NullTime   `json:"approved_at"`
+}
+
+type KnowledgeSubmission struct {
+	ID          int64          `json:"id"`
+	Title       string         `json:"title"`
+	Content     string         `json:"content"`
+	Category    sql.NullString `json:"category"`
+	SubmittedBy int64          `json:"submitted_by"`
+	Status      sql.NullString `json:"status"`
+	AdminNotes  sql.NullString `json:"admin_notes"`
+	CreatedAt   sql.NullTime   `json:"created_at"`
+	ReviewedAt  sql.NullTime   `json:"reviewed_at"`
+	ReviewedBy  sql.NullInt64  `json:"reviewed_by"`
+}
+
 type Notification struct {
 	ID        int64         `json:"id"`
 	UserID    int64         `json:"user_id"`
@@ -92,6 +117,19 @@ type SystemConfig struct {
 	Value       string         `json:"value"`
 	Description sql.NullString `json:"description"`
 	UpdatedAt   sql.NullTime   `json:"updated_at"`
+}
+
+type UnansweredQuestion struct {
+	ID             int64          `json:"id"`
+	Question       string         `json:"question"`
+	AskedBy        int64          `json:"asked_by"`
+	ConversationID sql.NullInt64  `json:"conversation_id"`
+	Answer         sql.NullString `json:"answer"`
+	AnsweredBy     sql.NullInt64  `json:"answered_by"`
+	Status         sql.NullString `json:"status"`
+	AddToKnowledge sql.NullInt64  `json:"add_to_knowledge"`
+	CreatedAt      sql.NullTime   `json:"created_at"`
+	AnsweredAt     sql.NullTime   `json:"answered_at"`
 }
 
 type User struct {

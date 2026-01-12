@@ -13,6 +13,8 @@ import (
 	"chat-empleados/db"
 	"chat-empleados/internal/middleware"
 	"chat-empleados/internal/services"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AdminHandler struct {
@@ -51,15 +53,15 @@ func (h *AdminHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	filterCount, _ := h.queries.CountActiveFilters(r.Context())
 
-	data := map[string]interface{}{
-		"Title":        "Panel de Administracion",
+	data := TemplateData(r, map[string]interface{}{
+		"Title":        Tr(r, "admin_panel"),
 		"User":         user,
 		"Stats":        stats,
 		"PendingUsers": pendingUsers,
 		"RecentLogs":   recentLogs,
 		"FilterCount":  filterCount,
-	}
-	h.templates.ExecuteTemplate(w, "admin.html", data)
+	})
+	h.templates.ExecuteTemplate(w, "admin", data)
 }
 
 func (h *AdminHandler) Users(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +83,7 @@ func (h *AdminHandler) Users(w http.ResponseWriter, r *http.Request) {
 		"AllUsers":     allUsers,
 		"PendingUsers": pendingUsers,
 	}
-	h.templates.ExecuteTemplate(w, "admin_users.html", data)
+	h.templates.ExecuteTemplate(w, "admin_users", data)
 }
 
 func (h *AdminHandler) ApproveUser(w http.ResponseWriter, r *http.Request) {
@@ -172,7 +174,7 @@ func (h *AdminHandler) SecurityFilters(w http.ResponseWriter, r *http.Request) {
 		"Categories": categories,
 		"Stats":      stats,
 	}
-	h.templates.ExecuteTemplate(w, "admin_filters.html", data)
+	h.templates.ExecuteTemplate(w, "admin_filters", data)
 }
 
 func (h *AdminHandler) CreateFilter(w http.ResponseWriter, r *http.Request) {
@@ -307,7 +309,7 @@ func (h *AdminHandler) SecurityLogs(w http.ResponseWriter, r *http.Request) {
 		"Logs":  logs,
 		"Stats": stats,
 	}
-	h.templates.ExecuteTemplate(w, "admin_logs.html", data)
+	h.templates.ExecuteTemplate(w, "admin_logs", data)
 }
 
 func (h *AdminHandler) GetStats(w http.ResponseWriter, r *http.Request) {
@@ -319,4 +321,53 @@ func (h *AdminHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
+}
+
+func (h *AdminHandler) AdminChangePassword(w http.ResponseWriter, r *http.Request) {
+	adminUser := middleware.GetUserFromContext(r.Context())
+
+	userIDStr := r.PathValue("id")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Error procesando formulario", http.StatusBadRequest)
+		return
+	}
+
+	newPassword := r.FormValue("new_password")
+	if newPassword == "" || len(newPassword) < 6 {
+		http.Error(w, "La contraseña debe tener al menos 6 caracteres", http.StatusBadRequest)
+		return
+	}
+
+	targetUser, err := h.queries.GetUserByID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Usuario no encontrado", http.StatusNotFound)
+		return
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Error procesando contraseña", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = h.queries.UpdateUserPassword(r.Context(), db.UpdateUserPasswordParams{
+		PasswordHash: string(newHash),
+		ID:           userID,
+	})
+	if err != nil {
+		http.Error(w, "Error actualizando contraseña", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[INFO] Admin %s cambió la contraseña del usuario %s (%s)", adminUser.Nomina, targetUser.Nombre, targetUser.Nomina)
+
+	w.Header().Set("HX-Trigger", "passwordChanged")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Contraseña actualizada"))
 }

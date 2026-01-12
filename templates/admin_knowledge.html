@@ -1,0 +1,214 @@
+{{define "admin_knowledge"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    {{template "navbar" .}}
+    <main class="container">
+<div class="admin-container">
+    <div class="admin-header">
+        <h1>Gestion de Conocimiento</h1>
+        <div class="admin-nav">
+            <a href="/admin" class="btn btn-secondary">Dashboard</a>
+            <a href="/admin/users" class="btn btn-secondary">Usuarios</a>
+            <a href="/admin/filters" class="btn btn-secondary">Filtros</a>
+            <a href="/admin/logs" class="btn btn-secondary">Logs</a>
+            <a href="/admin/knowledge" class="btn btn-primary">Conocimiento</a>
+        </div>
+    </div>
+
+    <div class="stats-grid stats-small">
+        <div class="stat-card">
+            <div class="stat-value">{{.PendingCount}}</div>
+            <div class="stat-label">Envios Pendientes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{.QuestionsCount}}</div>
+            <div class="stat-label">Preguntas Sin Respuesta</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{len .AllKnowledge}}</div>
+            <div class="stat-label">Base de Conocimiento</div>
+        </div>
+    </div>
+
+    {{if .PendingSubmissions}}
+    <section class="admin-section">
+        <h2>Envios Pendientes de Revision ({{len .PendingSubmissions}})</h2>
+        <div class="submissions-list">
+            {{range .PendingSubmissions}}
+            <div class="submission-card" id="submission-{{.ID}}">
+                <div class="submission-header">
+                    <h3>{{.Title}}</h3>
+                    <span class="category-badge">{{.Category.String}}</span>
+                </div>
+                <div class="submission-content">{{.Content}}</div>
+                <div class="submission-meta">
+                    <span>Enviado por: {{.SubmittedByName}} ({{.SubmittedByNomina}})</span>
+                    <span>{{formatDate .CreatedAt}}</span>
+                </div>
+                <div class="submission-actions">
+                    <form hx-post="/admin/knowledge/approve/{{.ID}}" hx-target="#submission-{{.ID}}" hx-swap="outerHTML" style="display: inline;">
+                        <input type="text" name="admin_notes" placeholder="Notas (opcional)" style="width: 200px;">
+                        <button type="submit" class="btn btn-sm btn-success">Aprobar</button>
+                    </form>
+                    <form hx-post="/admin/knowledge/reject/{{.ID}}" hx-target="#submission-{{.ID}}" hx-swap="outerHTML" hx-confirm="Rechazar este envio?" style="display: inline;">
+                        <input type="text" name="admin_notes" placeholder="Razon de rechazo">
+                        <button type="submit" class="btn btn-sm btn-danger">Rechazar</button>
+                    </form>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </section>
+    {{end}}
+
+    {{if .PendingQuestions}}
+    <section class="admin-section">
+        <h2>Preguntas Sin Respuesta ({{len .PendingQuestions}}) - Entrenamiento</h2>
+        <p class="section-description">Estas son preguntas que los usuarios hicieron al chat IA pero no obtuvieron respuesta satisfactoria. Responde para entrenar la base de conocimiento.</p>
+        <div class="questions-list">
+            {{range .PendingQuestions}}
+            <div class="question-card" id="question-{{.ID}}">
+                <div class="question-content">
+                    <strong>Pregunta:</strong> {{.Question}}
+                </div>
+                <div class="question-meta">
+                    <span>Preguntado por: {{.AskedByName}} ({{.AskedByNomina}})</span>
+                    <span>{{formatDate .CreatedAt}}</span>
+                </div>
+                <form hx-post="/admin/knowledge/question/{{.ID}}/answer" hx-target="#question-{{.ID}}" hx-swap="outerHTML" class="answer-form">
+                    <div class="form-group">
+                        <label>Respuesta:</label>
+                        <textarea name="answer" rows="3" required placeholder="Escribe la respuesta correcta..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="add_to_knowledge" value="true" checked>
+                            Agregar pregunta y respuesta a la base de conocimiento
+                        </label>
+                    </div>
+                    <div class="question-actions">
+                        <button type="submit" class="btn btn-sm btn-primary">Responder</button>
+                        <button type="button" class="btn btn-sm btn-secondary"
+                                hx-post="/admin/knowledge/question/{{.ID}}/ignore"
+                                hx-target="#question-{{.ID}}"
+                                hx-swap="outerHTML"
+                                hx-confirm="Ignorar esta pregunta?">Ignorar</button>
+                    </div>
+                </form>
+            </div>
+            {{end}}
+        </div>
+    </section>
+    {{end}}
+
+    <section class="admin-section">
+        <h2>Base de Conocimiento Actual ({{len .AllKnowledge}})</h2>
+        {{if .AllKnowledge}}
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Titulo</th>
+                    <th>Categoria</th>
+                    <th>Enviado por</th>
+                    <th>Aprobado por</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .AllKnowledge}}
+                <tr id="knowledge-{{.ID}}">
+                    <td>{{.Title}}</td>
+                    <td>{{.Category.String}}</td>
+                    <td>{{.SubmittedByName}}</td>
+                    <td>{{if .ApprovedByName.String}}{{.ApprovedByName.String}}{{else}}-{{end}}</td>
+                    <td>
+                        {{if eq .IsActive.Int64 1}}
+                        <span class="status-badge status-active">Activo</span>
+                        {{else}}
+                        <span class="status-badge status-inactive">Inactivo</span>
+                        {{end}}
+                    </td>
+                    <td class="actions">
+                        <button hx-delete="/admin/knowledge/{{.ID}}"
+                                hx-target="#knowledge-{{.ID}}"
+                                hx-swap="outerHTML"
+                                hx-confirm="Eliminar este conocimiento?"
+                                class="btn btn-sm btn-danger">Eliminar</button>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p class="empty-message">No hay conocimiento en la base de datos</p>
+        {{end}}
+    </section>
+</div>
+    </main>
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+
+    <style>
+    .submission-card, .question-card {
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: var(--shadow);
+    }
+    .submission-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    .submission-header h3 {
+        margin: 0;
+    }
+    .category-badge {
+        background: var(--primary-light);
+        color: var(--primary);
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+    }
+    .submission-content, .question-content {
+        background: var(--bg-secondary);
+        padding: 1rem;
+        border-radius: var(--radius-sm);
+        white-space: pre-wrap;
+        margin-bottom: 1rem;
+    }
+    .submission-meta, .question-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        color: var(--text-light);
+        margin-bottom: 1rem;
+    }
+    .submission-actions, .question-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .answer-form {
+        margin-top: 1rem;
+    }
+    .section-description {
+        color: var(--text-light);
+        margin-bottom: 1rem;
+    }
+    </style>
+</body>
+</html>
+{{end}}

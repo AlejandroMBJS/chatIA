@@ -1,84 +1,120 @@
-{{define "content"}}
-<div class="profile-container">
-    <div class="profile-card">
-        <h1>Mi Perfil</h1>
+{{define "profile"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+    .profile-container {
+        max-width: 500px;
+        margin: 2rem auto;
+    }
+    .profile-card {
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        padding: 2rem;
+    }
+    .profile-card h1 {
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+    .profile-info {
+        margin-bottom: 1.5rem;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--border);
+    }
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    .info-row label {
+        font-weight: 600;
+        color: var(--text-light);
+    }
+    .profile-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+    }
+    </style>
+</head>
+<body>
+    {{template "navbar" .}}
 
-        <div class="profile-info">
-            <div class="info-row">
-                <label>Nombre:</label>
-                <span>{{.User.Nombre}}</span>
+    <main class="container">
+        <div class="profile-container">
+            <div class="profile-card">
+                <h1>{{if .T}}{{index .T "my_profile"}}{{else}}Mi Perfil{{end}}</h1>
+
+                <div class="profile-info">
+                    <div class="info-row">
+                        <label>{{if eq .Lang "en"}}Name{{else}}Nombre{{end}}:</label>
+                        <span>{{.User.Nombre}}</span>
+                    </div>
+                    <div class="info-row">
+                        <label>{{if .T}}{{index .T "nomina"}}{{else}}Nomina{{end}}:</label>
+                        <span>{{.User.Nomina}}</span>
+                    </div>
+                    <div class="info-row">
+                        <label>{{if eq .Lang "en"}}Department{{else}}Departamento{{end}}:</label>
+                        <span>{{if .User.Departamento}}{{.User.Departamento}}{{else}}{{if eq .Lang "en"}}Not specified{{else}}No especificado{{end}}{{end}}</span>
+                    </div>
+                    <div class="info-row">
+                        <label>{{if eq .Lang "en"}}Role{{else}}Rol{{end}}:</label>
+                        <span>
+                            {{if .User.IsAdmin}}
+                            <span class="role-badge role-admin">{{if eq .Lang "en"}}Administrator{{else}}Administrador{{end}}</span>
+                            {{else}}
+                            <span class="role-badge role-user">{{if eq .Lang "en"}}User{{else}}Usuario{{end}}</span>
+                            {{end}}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="profile-actions">
+                    <a href="/chat" class="btn btn-primary">{{if eq .Lang "en"}}Go to Chat{{else}}Ir al Chat{{end}}</a>
+                    <a href="/ai" class="btn btn-secondary">{{if eq .Lang "en"}}Chat with AI{{else}}Chat con IA{{end}}</a>
+                </div>
             </div>
-            <div class="info-row">
-                <label>Nomina:</label>
-                <span>{{.User.Nomina}}</span>
-            </div>
-            <div class="info-row">
-                <label>Departamento:</label>
-                <span>{{if .User.Departamento}}{{.User.Departamento}}{{else}}No especificado{{end}}</span>
-            </div>
-            <div class="info-row">
-                <label>Rol:</label>
-                <span>
-                    {{if .User.IsAdmin}}
-                    <span class="role-badge role-admin">Administrador</span>
-                    {{else}}
-                    <span class="role-badge role-user">Usuario</span>
-                    {{end}}
-                </span>
+
+            <div class="profile-card" style="margin-top: 1.5rem;">
+                <h2 style="margin-bottom: 1rem;">{{if eq .Lang "en"}}Change Password{{else}}Cambiar Contraseña{{end}}</h2>
+
+                {{if .PasswordError}}
+                <div class="alert alert-error">{{.PasswordError}}</div>
+                {{end}}
+                {{if .PasswordSuccess}}
+                <div class="alert alert-success">{{.PasswordSuccess}}</div>
+                {{end}}
+
+                <form method="POST" action="/profile/password" class="form-vertical">
+                    <div class="form-group">
+                        <label>{{if eq .Lang "en"}}Current Password{{else}}Contraseña Actual{{end}}</label>
+                        <input type="password" name="current_password" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label>{{if eq .Lang "en"}}New Password{{else}}Nueva Contraseña{{end}}</label>
+                        <input type="password" name="new_password" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label>{{if eq .Lang "en"}}Confirm New Password{{else}}Confirmar Nueva Contraseña{{end}}</label>
+                        <input type="password" name="confirm_password" required minlength="6">
+                    </div>
+                    <button type="submit" class="btn btn-warning">{{if eq .Lang "en"}}Change Password{{else}}Cambiar Contraseña{{end}}</button>
+                </form>
             </div>
         </div>
+    </main>
 
-        <div class="profile-actions">
-            <a href="/chat" class="btn btn-primary">Ir al Chat</a>
-            <a href="/ai" class="btn btn-secondary">Chat con IA</a>
-        </div>
-    </div>
-</div>
-
-<style>
-.profile-container {
-    max-width: 500px;
-    margin: 2rem auto;
-}
-
-.profile-card {
-    background: var(--card-bg);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    padding: 2rem;
-}
-
-.profile-card h1 {
-    margin-bottom: 1.5rem;
-    text-align: center;
-}
-
-.profile-info {
-    margin-bottom: 1.5rem;
-}
-
-.info-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.info-row:last-child {
-    border-bottom: none;
-}
-
-.info-row label {
-    font-weight: 600;
-    color: var(--text-light);
-}
-
-.profile-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-}
-</style>
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+</body>
+</html>
 {{end}}
-
-{{template "base" .}}

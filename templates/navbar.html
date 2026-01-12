@@ -1,0 +1,29 @@
+{{define "navbar"}}
+<nav class="navbar">
+    <div class="nav-brand">
+        <a href="/ai" class="brand-link">
+            <img src="/static/logo.svg" alt="AQUILA" class="brand-logo">
+            <span class="brand-name">AQUILA</span>
+        </a>
+    </div>
+    <div class="nav-links">
+        <a href="/ai" class="nav-link">{{if .T}}{{index .T "ai_chat"}}{{else}}Chat IA{{end}}</a>
+        <a href="/knowledge" class="nav-link">{{if eq .Lang "en"}}Knowledge{{else}}Conocimiento{{end}}</a>
+        <a href="/profile" class="nav-link">{{if eq .Lang "en"}}Profile{{else}}Perfil{{end}}</a>
+        {{if .User.IsAdmin}}
+        <a href="/admin" class="nav-link admin-link">Admin</a>
+        {{end}}
+    </div>
+    <div class="nav-user">
+        <div class="lang-selector">
+            <a href="/set-language?lang=es" class="lang-btn {{if eq .Lang "es"}}active{{end}}" title="Espanol">ES</a>
+            <a href="/set-language?lang=en" class="lang-btn {{if eq .Lang "en"}}active{{end}}" title="English">EN</a>
+        </div>
+        <span class="user-name">{{.User.Nombre}}</span>
+        <span class="user-nomina">({{.User.Nomina}})</span>
+        <form action="/logout" method="POST" class="logout-form">
+            <button type="submit" class="btn btn-logout">{{if .T}}{{index .T "logout"}}{{else}}Salir{{end}}</button>
+        </form>
+    </div>
+</nav>
+{{end}}

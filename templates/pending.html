@@ -1,33 +1,133 @@
-{{define "content"}}
-<div class="auth-container">
-    <div class="auth-card">
-        <div class="auth-header">
-            <div class="pending-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12,6 12,12 16,14"></polyline>
-                </svg>
-            </div>
-            <h1>Cuenta Pendiente</h1>
-        </div>
-
-        <div class="pending-message">
-            <p>Tu cuenta ha sido creada exitosamente.</p>
-            <p>Un administrador debe aprobar tu solicitud antes de que puedas acceder al sistema.</p>
-            <p>Esto puede tomar unos minutos o hasta 24 horas habiles.</p>
-        </div>
-
-        <div class="pending-actions">
-            <a href="/login" class="btn btn-secondary btn-block">
-                Intentar Iniciar Sesion
-            </a>
-        </div>
-
-        <div class="auth-footer">
-            <p>Si tu cuenta ya fue aprobada, intenta <a href="/login">iniciar sesion</a></p>
-        </div>
+{{define "pending"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+    .pending-icon.warning svg {
+        color: #f59e0b;
+    }
+    .alert-warning {
+        background-color: #fef3c7;
+        border: 1px solid #f59e0b;
+        color: #92400e;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .status-badge.pending {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+    .pending-info {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f3f4f6;
+        border-radius: 8px;
+    }
+    .pending-info h4 {
+        margin: 0 0 10px 0;
+        font-size: 0.95em;
+        color: #374151;
+    }
+    .pending-info ul {
+        margin: 0;
+        padding-left: 20px;
+        color: #6b7280;
+        font-size: 0.9em;
+    }
+    .pending-info li {
+        margin-bottom: 5px;
+    }
+    .btn-primary:disabled {
+        background-color: #9ca3af;
+        cursor: not-allowed;
+    }
+    .success-message {
+        color: #059669;
+        background-color: #d1fae5;
+        padding: 10px 15px;
+        border-radius: 6px;
+        text-align: center;
+    }
+    .error-message {
+        color: #dc2626;
+        background-color: #fee2e2;
+        padding: 10px 15px;
+        border-radius: 6px;
+        text-align: center;
+    }
+    </style>
+</head>
+<body>
+    <div class="lang-selector-guest">
+        <a href="/set-language?lang=es" class="lang-btn {{if eq .Lang "es"}}active{{end}}" title="Espanol">ES</a>
+        <a href="/set-language?lang=en" class="lang-btn {{if eq .Lang "en"}}active{{end}}" title="English">EN</a>
     </div>
-</div>
-{{end}}
 
-{{template "base" .}}
+    <main class="container">
+        <div class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <img src="/static/logo.svg" alt="AQUILA" class="auth-logo">
+                    <h1>AQUILA</h1>
+                    <p class="pending-subtitle">{{if .T}}{{index .T "account_pending"}}{{else}}Cuenta No Aprobada{{end}}</p>
+                </div>
+
+                <div class="pending-message">
+                    <div class="alert alert-warning">
+                        <strong>{{if .T}}{{index .T "account_not_approved"}}{{else}}Tu cuenta aun no ha sido aprobada{{end}}</strong>
+                    </div>
+                    <p>{{if eq .Lang "en"}}Your registration was successful, but you need administrator approval to access the system.{{else}}Tu registro fue exitoso, pero necesitas la aprobacion de un administrador para acceder al sistema.{{end}}</p>
+                    <p>{{if eq .Lang "en"}}Current status:{{else}}Estado actual:{{end}} <span class="status-badge pending">{{if .T}}{{index .T "pending_approval"}}{{else}}Pendiente de aprobacion{{end}}</span></p>
+                </div>
+
+                <div class="pending-actions">
+                    <button
+                        id="requestApprovalBtn"
+                        class="btn btn-primary btn-block"
+                        hx-post="/request-approval"
+                        hx-swap="innerHTML"
+                        hx-target="#requestResult"
+                        hx-disabled-elt="this">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;">
+                            <path d="M22 2L11 13"></path>
+                            <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                        </svg>
+                        {{if .T}}{{index .T "request_urgent_approval"}}{{else}}Solicitar Aprobacion Urgente{{end}}
+                    </button>
+                    <div id="requestResult" style="margin-top: 10px;"></div>
+
+                    <div style="margin-top: 15px;">
+                        <a href="/login" class="btn btn-secondary btn-block">
+                            {{if .T}}{{index .T "check_if_approved"}}{{else}}Verificar si ya fui aprobado{{end}}
+                        </a>
+                    </div>
+                </div>
+
+                <div class="pending-info">
+                    <h4>{{if .T}}{{index .T "while_waiting"}}{{else}}Mientras esperas:{{end}}</h4>
+                    <ul>
+                        <li>{{if .T}}{{index .T "contact_supervisor"}}{{else}}Contacta a tu supervisor si es urgente{{end}}</li>
+                        <li>{{if .T}}{{index .T "approval_time"}}{{else}}El proceso normal toma entre 5 minutos y 24 horas{{end}}</li>
+                        <li>{{if .T}}{{index .T "access_when_approved"}}{{else}}Recibiras acceso una vez aprobado{{end}}</li>
+                    </ul>
+                </div>
+
+                <div class="auth-footer">
+                    <p>{{if .T}}{{index .T "wrong_credentials"}}{{else}}Credenciales incorrectas?{{end}} <a href="/register">{{if .T}}{{index .T "register_again"}}{{else}}Registrate de nuevo{{end}}</a></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+</body>
+</html>
+{{end}}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"chat-empleados/db"
+	"chat-empleados/internal/i18n"
 )
 
 type contextKey string
@@ -20,6 +21,7 @@ const (
 	UserContextKey    contextKey = "user"
 	SessionContextKey contextKey = "session"
 	CSRFContextKey    contextKey = "csrf_token"
+	LangContextKey    contextKey = "lang"
 )
 
 // Rate limiter para prevenir ataques de fuerza bruta
@@ -32,7 +34,7 @@ type RateLimiter struct {
 
 var globalRateLimiter = &RateLimiter{
 	requests: make(map[string][]time.Time),
-	limit:    60,             // 60 requests
+	limit:    200,            // 200 requests
 	window:   time.Minute,    // por minuto
 }
 
@@ -385,4 +387,28 @@ func getClientIP(r *http.Request) string {
 		ip = ip[:idx]
 	}
 	return ip
+}
+
+// LanguageMiddleware detecta y establece el idioma del usuario
+func LanguageMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lang := i18n.DetectLanguage(r)
+		ctx := context.WithValue(r.Context(), LangContextKey, lang)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// GetLanguageFromContext obtiene el idioma del contexto
+func GetLanguageFromContext(ctx context.Context) i18n.Language {
+	lang, ok := ctx.Value(LangContextKey).(i18n.Language)
+	if !ok {
+		return i18n.DefaultLanguage
+	}
+	return lang
+}
+
+// GetTranslations obtiene todas las traducciones para el idioma actual
+func GetTranslations(ctx context.Context) map[string]string {
+	lang := GetLanguageFromContext(ctx)
+	return i18n.TrMap(lang)
 }

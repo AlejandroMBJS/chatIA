@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -22,15 +23,94 @@ type AIHandler struct {
 	templates *template.Template
 	ollama    *services.OllamaService
 	security  *services.SecurityService
+	scraper   *services.Scraper
 }
 
 func NewAIHandler(queries *db.Queries, templates *template.Template, ollama *services.OllamaService, security *services.SecurityService) *AIHandler {
+	// Config de scraper sin browser (más rápido y confiable)
+	scraperConfig := &services.ScraperConfig{
+		HTTPTimeout:       15 * time.Second,
+		MaxRetries:        2,
+		MaxContentSize:    5 * 1024 * 1024, // 5MB
+		UserAgent:         "AQUILA-Bot/1.0 (Enterprise Assistant)",
+		AllowedDomains:    []string{},
+		BlockedDomains:    []string{},
+		RequestsPerSecond: 2.0,
+		BurstSize:         5,
+		CacheTTL:          15 * time.Minute,
+		EnableCache:       true,
+		EnableBrowser:     false, // Deshabilitado para mayor velocidad
+	}
+
 	return &AIHandler{
 		queries:   queries,
 		templates: templates,
 		ollama:    ollama,
 		security:  security,
+		scraper:   services.NewScraper(scraperConfig),
 	}
+}
+
+// urlRegex para detectar URLs en mensajes
+var urlRegex = regexp.MustCompile(`https?://[^\s<>"{}|\\^` + "`" + `\[\]]+`)
+
+// extractURLs extrae todas las URLs de un texto
+func extractURLs(text string) []string {
+	matches := urlRegex.FindAllString(text, -1)
+	// Limpiar URLs (quitar puntuación final)
+	for i, url := range matches {
+		url = strings.TrimRight(url, ".,;:!?)")
+		matches[i] = url
+	}
+	return matches
+}
+
+// getKnowledgeContext obtiene el conocimiento empresarial como contexto para la IA
+func (h *AIHandler) getKnowledgeContext(ctx context.Context) string {
+	knowledge, err := h.queries.GetKnowledgeContext(ctx)
+	if err != nil || len(knowledge) == 0 {
+		return ""
+	}
+
+	var contextBuilder strings.Builder
+	contextBuilder.WriteString("\n\n--- CONOCIMIENTO EMPRESARIAL ---\n")
+	contextBuilder.WriteString("Usa la siguiente informacion para responder preguntas sobre la empresa:\n\n")
+
+	for _, k := range knowledge {
+		contextBuilder.WriteString(fmt.Sprintf("## %s [%s]\n%s\n\n", k.Title, k.Category.String, k.Content))
+	}
+
+	contextBuilder.WriteString("--- FIN CONOCIMIENTO ---\n")
+	return contextBuilder.String()
+}
+
+// enrichMessageWithURLContent extrae contenido de URLs y lo agrega al mensaje
+func (h *AIHandler) enrichMessageWithURLContent(ctx context.Context, content string) string {
+	urls := extractURLs(content)
+	if len(urls) == 0 {
+		return content
+	}
+
+	var enrichedContent strings.Builder
+	enrichedContent.WriteString(content)
+	enrichedContent.WriteString("\n\n--- CONTENIDO EXTRAIDO DE URLs ---\n")
+
+	for _, url := range urls {
+		log.Printf("[INFO] Extrayendo contenido de URL: %s", url)
+
+		scraped, err := h.scraper.ScrapeForAI(ctx, url, 8000) // Max 8000 chars por URL
+		if err != nil {
+			log.Printf("[WARN] Error scrapeando %s: %v", url, err)
+			enrichedContent.WriteString(fmt.Sprintf("\n[Error extrayendo %s: %v]\n", url, err))
+			continue
+		}
+
+		enrichedContent.WriteString(scraped)
+		enrichedContent.WriteString("\n")
+	}
+
+	enrichedContent.WriteString("--- FIN CONTENIDO URLs ---\n")
+	return enrichedContent.String()
 }
 
 func (h *AIHandler) AIPage(w http.ResponseWriter, r *http.Request) {
@@ -61,16 +141,16 @@ func (h *AIHandler) AIPage(w http.ResponseWriter, r *http.Request) {
 
 	ollamaAvailable := h.ollama.IsAvailable(r.Context())
 
-	data := map[string]interface{}{
-		"Title":            "Chat con IA",
+	data := TemplateData(r, map[string]interface{}{
+		"Title":            Tr(r, "ai_chat"),
 		"User":             user,
 		"Conversations":    conversations,
 		"CurrentConv":      currentConv,
 		"Messages":         messages,
 		"OllamaAvailable":  ollamaAvailable,
 		"Model":            h.ollama.GetModel(),
-	}
-	h.templates.ExecuteTemplate(w, "ai.html", data)
+	})
+	h.templates.ExecuteTemplate(w, "ai", data)
 }
 
 func (h *AIHandler) NewConversation(w http.ResponseWriter, r *http.Request) {
@@ -161,11 +241,26 @@ func (h *AIHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	messages := make([]services.Message, 0, len(history))
-	for _, msg := range history {
+	messages := make([]services.Message, 0, len(history)+1)
+
+	// Agregar contexto de conocimiento empresarial
+	knowledgeContext := h.getKnowledgeContext(r.Context())
+	if knowledgeContext != "" {
+		messages = append(messages, services.Message{
+			Role:    "system",
+			Content: knowledgeContext,
+		})
+	}
+
+	for i, msg := range history {
+		msgContent := msg.Content
+		// Enriquecer el ultimo mensaje del usuario con contenido de URLs
+		if i == len(history)-1 && msg.Role == "user" {
+			msgContent = h.enrichMessageWithURLContent(r.Context(), msgContent)
+		}
 		messages = append(messages, services.Message{
 			Role:    msg.Role,
-			Content: msg.Content,
+			Content: msgContent,
 		})
 	}
 
@@ -270,7 +365,7 @@ func (h *AIHandler) GetConversationMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	h.templates.ExecuteTemplate(w, "ai_messages.html", map[string]interface{}{
+	h.templates.ExecuteTemplate(w, "ai_messages", map[string]interface{}{
 		"Messages": messages,
 		"ConvID":   convID,
 	})
@@ -385,13 +480,25 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	messages := make([]services.Message, 0, len(history))
+	messages := make([]services.Message, 0, len(history)+1)
+
+	// Agregar contexto de conocimiento empresarial
+	knowledgeContext := h.getKnowledgeContext(r.Context())
+	if knowledgeContext != "" {
+		messages = append(messages, services.Message{
+			Role:    "system",
+			Content: knowledgeContext,
+		})
+	}
+
 	for _, msg := range history {
 		messages = append(messages, services.Message{
 			Role:    msg.Role,
 			Content: msg.Content,
 		})
 	}
+
+	log.Printf("[DEBUG] Iniciando streaming con %d mensajes para usuario %s", len(messages), user.Nomina)
 
 	// Configurar SSE
 	w.Header().Set("Content-Type", "text/event-stream")

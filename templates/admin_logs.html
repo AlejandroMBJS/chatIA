@@ -1,4 +1,16 @@
-{{define "content"}}
+{{define "admin_logs"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    {{template "navbar" .}}
+    <main class="container">
 <div class="admin-container">
     <div class="admin-header">
         <h1>Logs de Seguridad</h1>
@@ -7,6 +19,7 @@
             <a href="/admin/users" class="btn btn-secondary">Usuarios</a>
             <a href="/admin/filters" class="btn btn-secondary">Filtros</a>
             <a href="/admin/logs" class="btn btn-primary">Logs</a>
+            <a href="/admin/knowledge" class="btn btn-secondary">Conocimiento</a>
         </div>
     </div>
 
@@ -104,6 +117,10 @@
         </div>
     </section>
 </div>
+    </main>
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+</body>
+</html>
 {{end}}
-
-{{template "base" .}}

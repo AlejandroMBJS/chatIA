@@ -5,9 +5,11 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"html"
 	"html/template"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +20,16 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+// sanitizeInput limpia input de usuario para prevenir XSS y otros ataques
+func sanitizeInput(input string) string {
+	// Escapar HTML
+	input = html.EscapeString(input)
+	// Remover caracteres de control
+	controlChars := regexp.MustCompile(`[\x00-\x1f\x7f]`)
+	input = controlChars.ReplaceAllString(input, "")
+	return strings.TrimSpace(input)
+}
 
 type AuthHandler struct {
 	queries       *db.Queries
@@ -36,11 +48,11 @@ func NewAuthHandler(queries *db.Queries, cfg *config.Config, templates *template
 }
 
 func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
-	data := map[string]interface{}{
-		"Title": "Iniciar Sesion",
+	data := TemplateData(r, map[string]interface{}{
+		"Title": Tr(r, "login"),
 		"Error": r.URL.Query().Get("error"),
-	}
-	h.templates.ExecuteTemplate(w, "login.html", data)
+	})
+	h.templates.ExecuteTemplate(w, "login", data)
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +85,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !user.Approved.Valid || user.Approved.Int64 == 0 {
+		// Guardar nomina en cookie para permitir solicitar aprobacion
+		http.SetCookie(w, &http.Cookie{
+			Name:     "last_nomina",
+			Value:    nomina,
+			Path:     "/",
+			MaxAge:   3600, // 1 hora
+			HttpOnly: true,
+		})
 		http.Redirect(w, r, "/pending", http.StatusSeeOther)
 		return
 	}
@@ -132,11 +152,11 @@ func getClientIP(r *http.Request) string {
 }
 
 func (h *AuthHandler) RegisterPage(w http.ResponseWriter, r *http.Request) {
-	data := map[string]interface{}{
-		"Title": "Registro",
+	data := TemplateData(r, map[string]interface{}{
+		"Title": Tr(r, "register"),
 		"Error": r.URL.Query().Get("error"),
-	}
-	h.templates.ExecuteTemplate(w, "register.html", data)
+	})
+	h.templates.ExecuteTemplate(w, "register", data)
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -145,11 +165,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nomina := strings.TrimSpace(r.FormValue("nomina"))
+	nomina := sanitizeInput(r.FormValue("nomina"))
 	password := r.FormValue("password")
 	passwordConfirm := r.FormValue("password_confirm")
-	nombre := strings.TrimSpace(r.FormValue("nombre"))
-	departamento := strings.TrimSpace(r.FormValue("departamento"))
+	nombre := sanitizeInput(r.FormValue("nombre"))
+	departamento := sanitizeInput(r.FormValue("departamento"))
 
 	if nomina == "" || password == "" || nombre == "" {
 		http.Redirect(w, r, "/register?error=Todos los campos son requeridos", http.StatusSeeOther)
@@ -221,10 +241,10 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) PendingPage(w http.ResponseWriter, r *http.Request) {
-	data := map[string]interface{}{
-		"Title": "Cuenta Pendiente",
-	}
-	h.templates.ExecuteTemplate(w, "pending.html", data)
+	data := TemplateData(r, map[string]interface{}{
+		"Title": Tr(r, "account_pending"),
+	})
+	h.templates.ExecuteTemplate(w, "pending", data)
 }
 
 func (h *AuthHandler) Profile(w http.ResponseWriter, r *http.Request) {
@@ -234,11 +254,87 @@ func (h *AuthHandler) Profile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := map[string]interface{}{
-		"Title": "Mi Perfil",
+	data := TemplateData(r, map[string]interface{}{
+		"Title": Tr(r, "my_profile"),
 		"User":  user,
+	})
+	h.templates.ExecuteTemplate(w, "profile", data)
+}
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
 	}
-	h.templates.ExecuteTemplate(w, "profile.html", data)
+
+	if err := r.ParseForm(); err != nil {
+		h.renderProfileWithError(w, r, user, "Error procesando formulario")
+		return
+	}
+
+	currentPassword := r.FormValue("current_password")
+	newPassword := r.FormValue("new_password")
+	confirmPassword := r.FormValue("confirm_password")
+
+	if currentPassword == "" || newPassword == "" || confirmPassword == "" {
+		h.renderProfileWithError(w, r, user, "Todos los campos son requeridos")
+		return
+	}
+
+	if len(newPassword) < 6 {
+		h.renderProfileWithError(w, r, user, "La nueva contraseña debe tener al menos 6 caracteres")
+		return
+	}
+
+	if newPassword != confirmPassword {
+		h.renderProfileWithError(w, r, user, "Las contraseñas no coinciden")
+		return
+	}
+
+	dbUser, err := h.queries.GetUserByID(r.Context(), user.ID)
+	if err != nil {
+		h.renderProfileWithError(w, r, user, "Error verificando usuario")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(dbUser.PasswordHash), []byte(currentPassword)); err != nil {
+		h.renderProfileWithError(w, r, user, "Contraseña actual incorrecta")
+		return
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		h.renderProfileWithError(w, r, user, "Error procesando contraseña")
+		return
+	}
+
+	_, err = h.queries.UpdateUserPassword(r.Context(), db.UpdateUserPasswordParams{
+		PasswordHash: string(newHash),
+		ID:           user.ID,
+	})
+	if err != nil {
+		h.renderProfileWithError(w, r, user, "Error actualizando contraseña")
+		return
+	}
+
+	log.Printf("[INFO] Usuario %s cambió su contraseña", user.Nomina)
+
+	data := TemplateData(r, map[string]interface{}{
+		"Title":           Tr(r, "my_profile"),
+		"User":            user,
+		"PasswordSuccess": "Contraseña actualizada correctamente",
+	})
+	h.templates.ExecuteTemplate(w, "profile", data)
+}
+
+func (h *AuthHandler) renderProfileWithError(w http.ResponseWriter, r *http.Request, user *middleware.AuthUser, errorMsg string) {
+	data := TemplateData(r, map[string]interface{}{
+		"Title":         Tr(r, "my_profile"),
+		"User":          user,
+		"PasswordError": errorMsg,
+	})
+	h.templates.ExecuteTemplate(w, "profile", data)
 }
 
 func generateToken() (string, error) {
@@ -247,4 +343,52 @@ func generateToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// RequestApproval permite a usuarios pendientes solicitar aprobacion urgente
+func (h *AuthHandler) RequestApproval(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`<div class="error-message">Error procesando solicitud</div>`))
+		return
+	}
+
+	// Obtener nomina de la sesion o del formulario
+	nomina := r.FormValue("nomina")
+	if nomina == "" {
+		// Intentar obtener del cookie de ultimo login
+		cookie, err := r.Cookie("last_nomina")
+		if err == nil {
+			nomina = cookie.Value
+		}
+	}
+
+	if nomina == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`<div class="error-message">Por favor inicia sesion primero para solicitar aprobacion</div>`))
+		return
+	}
+
+	// Verificar que el usuario existe y esta pendiente
+	user, err := h.queries.GetUserByNomina(r.Context(), nomina)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`<div class="error-message">Usuario no encontrado. Registrate primero.</div>`))
+		return
+	}
+
+	if user.Approved.Valid && user.Approved.Int64 == 1 {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<div class="success-message">Tu cuenta ya esta aprobada! <a href="/login">Iniciar sesion</a></div>`))
+		return
+	}
+
+	// Notificar a los administradores
+	go h.notifications.NotifyAdminsUrgentApproval(context.Background(), user.Nombre, user.Nomina)
+
+	clientIP := getClientIP(r)
+	log.Printf("[INFO] Solicitud de aprobacion urgente: %s (%s) desde IP: %s", user.Nombre, user.Nomina, clientIP)
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`<div class="success-message">Solicitud enviada! Los administradores han sido notificados. Intenta iniciar sesion en unos minutos.</div>`))
 }

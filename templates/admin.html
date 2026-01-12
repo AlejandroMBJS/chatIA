@@ -1,123 +1,142 @@
-{{define "content"}}
-<div class="admin-container">
-    <div class="admin-header">
-        <h1>Panel de Administracion</h1>
-        <div class="admin-nav">
-            <a href="/admin" class="btn btn-primary">Dashboard</a>
-            <a href="/admin/users" class="btn btn-secondary">Usuarios</a>
-            <a href="/admin/filters" class="btn btn-secondary">Filtros</a>
-            <a href="/admin/logs" class="btn btn-secondary">Logs</a>
-        </div>
-    </div>
+{{define "admin"}}
+<!DOCTYPE html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}es{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AQUILA</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    {{template "navbar" .}}
 
-    <div class="stats-grid">
-        {{if .Stats}}
-        <div class="stat-card">
-            <div class="stat-value">{{.Stats.TotalUsers}}</div>
-            <div class="stat-label">Usuarios Activos</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">{{.Stats.PendingUsers}}</div>
-            <div class="stat-label">Pendientes</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">{{.Stats.TotalConversations}}</div>
-            <div class="stat-label">Conversaciones IA</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">{{.Stats.SecurityIncidentsToday}}</div>
-            <div class="stat-label">Incidentes Hoy</div>
-        </div>
-        {{end}}
-    </div>
-
-    <div class="admin-sections">
-        <section class="admin-section">
-            <h2>Usuarios Pendientes de Aprobacion</h2>
-            {{if .PendingUsers}}
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Nomina</th>
-                        <th>Nombre</th>
-                        <th>Departamento</th>
-                        <th>Fecha Registro</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="pending-users">
-                    {{range .PendingUsers}}
-                    <tr id="user-row-{{.ID}}">
-                        <td>{{.Nomina}}</td>
-                        <td>{{.Nombre}}</td>
-                        <td>{{.Departamento.String}}</td>
-                        <td>{{.CreatedAt}}</td>
-                        <td class="actions">
-                            <button hx-post="/admin/approve/{{.ID}}"
-                                    hx-target="#user-row-{{.ID}}"
-                                    hx-swap="outerHTML"
-                                    class="btn btn-sm btn-success">Aprobar</button>
-                            <button hx-post="/admin/reject/{{.ID}}"
-                                    hx-target="#user-row-{{.ID}}"
-                                    hx-swap="outerHTML"
-                                    hx-confirm="Rechazar a este usuario?"
-                                    class="btn btn-sm btn-danger">Rechazar</button>
-                        </td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
-            {{else}}
-            <p class="empty-message">No hay usuarios pendientes de aprobacion</p>
-            {{end}}
-        </section>
-
-        <section class="admin-section">
-            <div class="section-header">
-                <h2>Incidentes de Seguridad Recientes</h2>
-                <a href="/admin/logs" class="btn btn-sm btn-secondary">Ver todos</a>
+    <main class="container">
+        <div class="admin-container">
+            <div class="admin-header">
+                <h1>{{if eq .Lang "en"}}Admin Panel{{else}}Panel de Administracion{{end}}</h1>
+                <div class="admin-nav">
+                    <a href="/admin" class="btn btn-primary">Dashboard</a>
+                    <a href="/admin/users" class="btn btn-secondary">{{if eq .Lang "en"}}Users{{else}}Usuarios{{end}}</a>
+                    <a href="/admin/filters" class="btn btn-secondary">{{if eq .Lang "en"}}Filters{{else}}Filtros{{end}}</a>
+                    <a href="/admin/logs" class="btn btn-secondary">Logs</a>
+                    <a href="/admin/knowledge" class="btn btn-secondary">{{if eq .Lang "en"}}Knowledge{{else}}Conocimiento{{end}}</a>
+                </div>
             </div>
-            {{if .RecentLogs}}
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Usuario</th>
-                        <th>Filtro</th>
-                        <th>Severidad</th>
-                        <th>Accion</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .RecentLogs}}
-                    <tr>
-                        <td>{{.CreatedAt}}</td>
-                        <td>{{.Nombre}} ({{.Nomina}})</td>
-                        <td>{{.FilterName.String}}</td>
-                        <td>
-                            <span class="severity-badge severity-{{.Severity.String}}">
-                                {{.Severity.String}}
-                            </span>
-                        </td>
-                        <td>{{.ActionTaken}}</td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
-            {{else}}
-            <p class="empty-message">No hay incidentes de seguridad recientes</p>
-            {{end}}
-        </section>
 
-        <section class="admin-section">
-            <div class="section-header">
-                <h2>Filtros de Seguridad</h2>
-                <a href="/admin/filters" class="btn btn-sm btn-secondary">Gestionar</a>
+            <div class="stats-grid">
+                {{if .Stats}}
+                <div class="stat-card">
+                    <div class="stat-value">{{.Stats.TotalUsers}}</div>
+                    <div class="stat-label">{{if eq .Lang "en"}}Active Users{{else}}Usuarios Activos{{end}}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{.Stats.PendingUsers}}</div>
+                    <div class="stat-label">{{if eq .Lang "en"}}Pending{{else}}Pendientes{{end}}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{.Stats.TotalConversations}}</div>
+                    <div class="stat-label">{{if eq .Lang "en"}}AI Conversations{{else}}Conversaciones IA{{end}}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{.Stats.SecurityIncidentsToday}}</div>
+                    <div class="stat-label">{{if eq .Lang "en"}}Incidents Today{{else}}Incidentes Hoy{{end}}</div>
+                </div>
+                {{end}}
             </div>
-            <p>{{.FilterCount}} filtros activos protegiendo el sistema.</p>
-        </section>
-    </div>
-</div>
+
+            <div class="admin-sections">
+                <section class="admin-section">
+                    <h2>{{if eq .Lang "en"}}Pending Users{{else}}Usuarios Pendientes de Aprobacion{{end}}</h2>
+                    {{if .PendingUsers}}
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>{{if eq .Lang "en"}}ID{{else}}Nomina{{end}}</th>
+                                <th>{{if eq .Lang "en"}}Name{{else}}Nombre{{end}}</th>
+                                <th>{{if eq .Lang "en"}}Department{{else}}Departamento{{end}}</th>
+                                <th>{{if eq .Lang "en"}}Date{{else}}Fecha Registro{{end}}</th>
+                                <th>{{if eq .Lang "en"}}Actions{{else}}Acciones{{end}}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pending-users">
+                            {{range .PendingUsers}}
+                            <tr id="user-row-{{.ID}}">
+                                <td>{{.Nomina}}</td>
+                                <td>{{.Nombre}}</td>
+                                <td>{{.Departamento.String}}</td>
+                                <td>{{.CreatedAt}}</td>
+                                <td class="actions">
+                                    <button hx-post="/admin/approve/{{.ID}}"
+                                            hx-target="#user-row-{{.ID}}"
+                                            hx-swap="outerHTML"
+                                            class="btn btn-sm btn-success">{{if eq $.Lang "en"}}Approve{{else}}Aprobar{{end}}</button>
+                                    <button hx-post="/admin/reject/{{.ID}}"
+                                            hx-target="#user-row-{{.ID}}"
+                                            hx-swap="outerHTML"
+                                            hx-confirm="{{if eq $.Lang "en"}}Reject this user?{{else}}Rechazar a este usuario?{{end}}"
+                                            class="btn btn-sm btn-danger">{{if eq $.Lang "en"}}Reject{{else}}Rechazar{{end}}</button>
+                                </td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                    {{else}}
+                    <p class="empty-message">{{if eq .Lang "en"}}No pending users{{else}}No hay usuarios pendientes de aprobacion{{end}}</p>
+                    {{end}}
+                </section>
+
+                <section class="admin-section">
+                    <div class="section-header">
+                        <h2>{{if eq .Lang "en"}}Recent Security Incidents{{else}}Incidentes de Seguridad Recientes{{end}}</h2>
+                        <a href="/admin/logs" class="btn btn-sm btn-secondary">{{if eq .Lang "en"}}View all{{else}}Ver todos{{end}}</a>
+                    </div>
+                    {{if .RecentLogs}}
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>{{if eq .Lang "en"}}Date{{else}}Fecha{{end}}</th>
+                                <th>{{if eq .Lang "en"}}User{{else}}Usuario{{end}}</th>
+                                <th>{{if eq .Lang "en"}}Filter{{else}}Filtro{{end}}</th>
+                                <th>{{if eq .Lang "en"}}Severity{{else}}Severidad{{end}}</th>
+                                <th>{{if eq .Lang "en"}}Action{{else}}Accion{{end}}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .RecentLogs}}
+                            <tr>
+                                <td>{{.CreatedAt}}</td>
+                                <td>{{.Nombre}} ({{.Nomina}})</td>
+                                <td>{{.FilterName.String}}</td>
+                                <td>
+                                    <span class="severity-badge severity-{{.Severity.String}}">
+                                        {{.Severity.String}}
+                                    </span>
+                                </td>
+                                <td>{{.ActionTaken}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                    {{else}}
+                    <p class="empty-message">{{if eq .Lang "en"}}No recent security incidents{{else}}No hay incidentes de seguridad recientes{{end}}</p>
+                    {{end}}
+                </section>
+
+                <section class="admin-section">
+                    <div class="section-header">
+                        <h2>{{if eq .Lang "en"}}Security Filters{{else}}Filtros de Seguridad{{end}}</h2>
+                        <a href="/admin/filters" class="btn btn-sm btn-secondary">{{if eq .Lang "en"}}Manage{{else}}Gestionar{{end}}</a>
+                    </div>
+                    <p>{{.FilterCount}} {{if eq .Lang "en"}}active filters protecting the system{{else}}filtros activos protegiendo el sistema{{end}}.</p>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>AQUILA - IRIS IA Chat</p>
+    </footer>
+</body>
+</html>
 {{end}}
-
-{{template "base" .}}
