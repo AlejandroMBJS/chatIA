@@ -107,14 +107,14 @@
         <h2>Filtros Existentes ({{len .Filters}})</h2>
         <div class="filters-list" hx-target="closest .filter-item" hx-swap="outerHTML">
             {{range .Filters}}
-            <div class="filter-item {{if eq .IsActive 0}}filter-disabled{{end}}" id="filter-{{.ID}}">
+            <div class="filter-item {{if eq .IsActive.Int64 0}}filter-disabled{{end}}" id="filter-{{.ID}}">
                 <div class="filter-header">
                     <h3>{{.Name}}</h3>
                     <div class="filter-badges">
                         <span class="type-badge">{{.FilterType}}</span>
                         <span class="action-badge action-{{.Action}}">{{.Action}}</span>
                         <span class="severity-badge severity-{{.Severity.String}}">{{.Severity.String}}</span>
-                        {{if eq .IsActive 1}}
+                        {{if eq .IsActive.Int64 1}}
                         <span class="status-badge status-active">Activo</span>
                         {{else}}
                         <span class="status-badge status-inactive">Inactivo</span>
@@ -131,8 +131,8 @@
                 </div>
                 <div class="filter-actions">
                     <button hx-post="/admin/filters/toggle/{{.ID}}"
-                            class="btn btn-sm {{if eq .IsActive 1}}btn-warning{{else}}btn-success{{end}}">
-                        {{if eq .IsActive 1}}Desactivar{{else}}Activar{{end}}
+                            class="btn btn-sm {{if eq .IsActive.Int64 1}}btn-warning{{else}}btn-success{{end}}">
+                        {{if eq .IsActive.Int64 1}}Desactivar{{else}}Activar{{end}}
                     </button>
                     <button hx-delete="/admin/filters/delete/{{.ID}}"
                             hx-confirm="Eliminar este filtro permanentemente?"
