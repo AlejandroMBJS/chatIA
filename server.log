@@ -1,25 +1,80 @@
-2026/01/12 13:42:22 [INFO] Cargados 17 filtros de seguridad activos
-2026/01/12 13:42:22 [INFO] ========================================
-2026/01/12 13:42:22 [INFO] AQUILA - IRIS IA Chat
-2026/01/12 13:42:22 [INFO] ========================================
-2026/01/12 13:42:22 [INFO] Servidor iniciando en puerto 9999
-2026/01/12 13:42:22 [INFO] Base de datos: ./chat.db
-2026/01/12 13:42:22 [INFO] Ollama URL: http://localhost:11434
-2026/01/12 13:42:22 [INFO] Modelo IA: deepseek-r1:14b
-2026/01/12 13:42:22 [INFO] Filtros de seguridad: true
-2026/01/12 13:42:22 [INFO] ========================================
-2026/01/12 13:42:22 [INFO] Usuario admin por defecto:
-2026/01/12 13:42:22 [INFO]   Nomina: admin
-2026/01/12 13:42:22 [INFO]   Password: admin123
-2026/01/12 13:42:22 [INFO] ========================================
-2026/01/12 13:42:22 [INFO] Ollama disponible en http://localhost:11434
-2026/01/12 13:42:22 [INFO] Ollama disponible y funcionando
-2026/01/12 13:42:24 [GET] /health [::1]
-2026/01/12 13:42:52 [GET] /ai [::1]
-2026/01/12 13:42:52 [GET] /static/styles.css [::1]
-2026/01/12 13:42:52 [GET] /static/logo.svg [::1]
-2026/01/12 13:42:52 [GET] /favicon.ico [::1]
-2026/01/12 13:42:52 [GET] /ai [::1]
-2026/01/12 13:42:56 [POST] /ai/stream [::1]
-2026/01/12 13:42:58 [POST] /ai/stream [::1]
-2026/01/12 13:42:58 [DEBUG] Iniciando streaming con 2 mensajes para usuario admin
+2026/01/12 13:59:55 [INFO] Cargados 17 filtros de seguridad activos
+2026/01/12 13:59:55 [INFO] ========================================
+2026/01/12 13:59:55 [INFO] AQUILA - IRIS IA Chat
+2026/01/12 13:59:55 [INFO] ========================================
+2026/01/12 13:59:55 [INFO] Servidor iniciando en puerto 9999
+2026/01/12 13:59:55 [INFO] Base de datos: ./chat.db
+2026/01/12 13:59:55 [INFO] Ollama URL: http://localhost:11434
+2026/01/12 13:59:55 [INFO] Modelo IA: deepseek-r1:14b
+2026/01/12 13:59:55 [INFO] Filtros de seguridad: true
+2026/01/12 13:59:55 [INFO] ========================================
+2026/01/12 13:59:55 [INFO] Usuario admin por defecto:
+2026/01/12 13:59:55 [INFO]   Nomina: admin
+2026/01/12 13:59:55 [INFO]   Password: admin123
+2026/01/12 13:59:55 [INFO] ========================================
+2026/01/12 13:59:55 [INFO] Ollama disponible en http://localhost:11434
+2026/01/12 13:59:55 [INFO] Ollama disponible y funcionando
+2026/01/12 13:59:58 [GET] /health [::1]
+2026/01/12 14:00:15 [POST] /login [::1]
+2026/01/12 14:00:15 [INFO] Login exitoso: Administrador (admin) desde IP: [::1]
+2026/01/12 14:00:15 [POST] /ai/stream [::1]
+2026/01/12 14:01:05 [POST] /ai/stream [::1]
+2026/01/12 14:02:21 [POST] /login [::1]
+2026/01/12 14:02:21 [INFO] Login exitoso: Administrador (admin) desde IP: [::1]
+2026/01/12 14:02:21 [POST] /ai/stream [::1]
+2026/01/12 14:02:21 [POST] /login [::1]
+2026/01/12 14:02:21 [POST] /login [::1]
+2026/01/12 14:02:21 [POST] /login [::1]
+2026/01/12 14:02:21 [POST] /login [::1]
+2026/01/12 14:02:21 [POST] /login [::1]
+2026/01/12 14:02:21 [POST] /login [::1]
+2026/01/12 14:02:21 [SECURITY] Auth rate limit exceeded for IP: [::1]
+2026/01/12 14:03:12 [POST] /ai/stream [::1]
+2026/01/12 14:03:12 [DEBUG] Iniciando streaming con 2 mensajes para usuario 1
+2026/01/12 14:03:12 [DEBUG] Enviando evento start con convID=3
+2026/01/12 14:03:12 [DEBUG] Llamando a ChatStream...
+2026/01/12 14:03:12 [DEBUG] ChatStream: iniciando para usuario 1
+2026/01/12 14:03:12 [DEBUG] ChatStream: enviando request a Ollama...
+2026/01/12 14:03:27 [DEBUG] Heartbeat enviado, esperando respuesta de modelo...
+2026/01/12 14:03:42 [DEBUG] Cliente desconectado durante streaming
+2026/01/12 14:03:42 [DEBUG] ChatStream: error conectando: Post "http://localhost:11434/api/chat": context canceled
+2026/01/12 14:04:02 [POST] /ai/stream [::1]
+2026/01/12 14:04:02 [DEBUG] Iniciando streaming con 2 mensajes para usuario 1
+2026/01/12 14:04:02 [DEBUG] Enviando evento start con convID=4
+2026/01/12 14:04:02 [DEBUG] Llamando a ChatStream...
+2026/01/12 14:04:02 [DEBUG] ChatStream: iniciando para usuario 1
+2026/01/12 14:04:02 [DEBUG] ChatStream: enviando request a Ollama...
+2026/01/12 14:04:17 [DEBUG] Heartbeat enviado, esperando respuesta de modelo...
+2026/01/12 14:04:32 [DEBUG] Heartbeat enviado, esperando respuesta de modelo...
+2026/01/12 14:04:47 [DEBUG] Heartbeat enviado, esperando respuesta de modelo...
+2026/01/12 14:05:02 [DEBUG] Heartbeat enviado, esperando respuesta de modelo...
+2026/01/12 14:05:11 [DEBUG] ChatStream: respuesta recibida, status=200
+2026/01/12 14:06:00 [DEBUG] ChatStream terminado, err=<nil>
+2026/01/12 14:06:38 [GET] / [::1]
+2026/01/12 14:06:38 [GET] /ai [::1]
+2026/01/12 14:06:38 [GET] /static/styles.css [::1]
+2026/01/12 14:06:38 [GET] /static/logo.svg [::1]
+2026/01/12 14:06:38 [GET] /favicon.ico [::1]
+2026/01/12 14:06:38 [GET] /ai [::1]
+2026/01/12 14:06:40 [GET] /ai [::1]
+2026/01/12 14:06:40 [GET] /static/styles.css [::1]
+2026/01/12 14:06:40 [GET] /static/logo.svg [::1]
+2026/01/12 14:06:40 [GET] /favicon.ico [::1]
+2026/01/12 14:06:40 [GET] /ai [::1]
+2026/01/12 14:06:43 [POST] /ai/stream [::1]
+2026/01/12 14:06:48 [GET] /ai [::1]
+2026/01/12 14:06:48 [GET] /static/styles.css [::1]
+2026/01/12 14:06:48 [GET] /static/logo.svg [::1]
+2026/01/12 14:06:48 [GET] /favicon.ico [::1]
+2026/01/12 14:06:48 [GET] /ai [::1]
+2026/01/12 14:06:50 [GET] /ai [::1]
+2026/01/12 14:06:50 [GET] /static/styles.css [::1]
+2026/01/12 14:06:50 [GET] /static/logo.svg [::1]
+2026/01/12 14:06:50 [GET] /favicon.ico [::1]
+2026/01/12 14:06:50 [GET] /ai [::1]
+2026/01/12 14:06:50 [GET] /ai [::1]
+2026/01/12 14:06:50 [GET] /static/styles.css [::1]
+2026/01/12 14:06:50 [GET] /static/logo.svg [::1]
+2026/01/12 14:06:51 [GET] /favicon.ico [::1]
+2026/01/12 14:06:51 [GET] /ai [::1]
+2026/01/12 14:06:54 [POST] /ai/stream [::1]

@@ -498,7 +498,7 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	log.Printf("[DEBUG] Iniciando streaming con %d mensajes para usuario %s", len(messages), user.Nomina)
+	log.Printf("[DEBUG] Iniciando streaming con %d mensajes para usuario %d", len(messages), user.ID)
 
 	// Configurar SSE
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -513,37 +513,82 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Enviar evento inicial con ID de conversación
-	fmt.Fprintf(w, "event: start\ndata: {\"conversation_id\": %d}\n\n", convID)
+	log.Printf("[DEBUG] Enviando evento start con convID=%d", convID)
+	fmt.Fprintf(w, "data: {\"conversation_id\": %d}\n\n", convID)
 	flusher.Flush()
 
 	var fullResponse strings.Builder
+	var streamErr error
+	var filterResult *services.FilterResult
+	streamDone := make(chan struct{})
+	gotFirstChunk := false
 
-	// Streaming de respuesta
-	filterResult, err := h.ollama.ChatStream(r.Context(), messages, user.ID, func(chunk string) error {
-		fullResponse.WriteString(chunk)
+	// Usar contexto con timeout largo (10 minutos) para modelos lentos como DeepSeek R1
+	streamCtx, cancelStream := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancelStream()
 
-		// Enviar chunk como evento SSE
-		data := map[string]string{"content": chunk}
-		jsonData, _ := json.Marshal(data)
-		fmt.Fprintf(w, "event: chunk\ndata: %s\n\n", jsonData)
-		flusher.Flush()
-		return nil
-	})
+	log.Printf("[DEBUG] Llamando a ChatStream...")
 
-	if err != nil {
-		log.Printf("[ERROR] Error en streaming Ollama: %v", err)
-		fmt.Fprintf(w, "event: error\ndata: {\"error\": \"Error comunicando con la IA\"}\n\n")
+	// Iniciar streaming en goroutine
+	go func() {
+		defer close(streamDone)
+		filterResult, streamErr = h.ollama.ChatStream(streamCtx, messages, user.ID, func(chunk string) error {
+			gotFirstChunk = true
+			fullResponse.WriteString(chunk)
+
+			// Enviar chunk como evento SSE
+			data := map[string]string{"content": chunk}
+			jsonData, _ := json.Marshal(data)
+			fmt.Fprintf(w, "data: %s\n\n", jsonData)
+			flusher.Flush()
+			return nil
+		})
+	}()
+
+	// Enviar heartbeats mientras esperamos respuesta del modelo
+	heartbeatTicker := time.NewTicker(15 * time.Second)
+	defer heartbeatTicker.Stop()
+
+	for {
+		select {
+		case <-streamDone:
+			// Streaming completado
+			goto streamComplete
+		case <-heartbeatTicker.C:
+			// Enviar heartbeat solo si aun no hemos recibido chunks
+			if !gotFirstChunk {
+				fmt.Fprintf(w, ": heartbeat\n\n")
+				flusher.Flush()
+				log.Printf("[DEBUG] Heartbeat enviado, esperando respuesta de modelo...")
+			}
+		case <-r.Context().Done():
+			// Cliente desconectado
+			log.Printf("[DEBUG] Cliente desconectado durante streaming")
+			cancelStream()
+			return
+		}
+	}
+
+streamComplete:
+	log.Printf("[DEBUG] ChatStream terminado, err=%v", streamErr)
+
+	if streamErr != nil {
+		log.Printf("[ERROR] Error en streaming Ollama: %v", streamErr)
+		fmt.Fprintf(w, "data: {\"error\": \"Error comunicando con la IA\"}\n\n")
 		flusher.Flush()
 		return
 	}
 
 	response := fullResponse.String()
 
+	// Usar contexto de background para operaciones de BD (no depender del cliente)
+	dbCtx := context.Background()
+
 	// Verificar si fue filtrado
 	if filterResult != nil && filterResult.Blocked {
 		response = "Lo siento, no puedo procesar esa solicitud por politicas de seguridad."
 
-		_, err = h.queries.CreateAIMessage(r.Context(), db.CreateAIMessageParams{
+		_, err = h.queries.CreateAIMessage(dbCtx, db.CreateAIMessageParams{
 			ConversationID: convID,
 			Role:           "assistant",
 			Content:        response,
@@ -552,7 +597,7 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 		})
 
 		h.security.LogViolation(
-			r.Context(),
+			dbCtx,
 			user.ID,
 			sql.NullInt64{Int64: filterResult.FilterID, Valid: true},
 			content,
@@ -565,7 +610,7 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	} else {
 		// Guardar respuesta normal
-		_, err = h.queries.CreateAIMessage(r.Context(), db.CreateAIMessageParams{
+		_, err = h.queries.CreateAIMessage(dbCtx, db.CreateAIMessageParams{
 			ConversationID: convID,
 			Role:           "assistant",
 			Content:        response,
@@ -577,7 +622,7 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.queries.TouchConversation(r.Context(), convID)
+	h.queries.TouchConversation(dbCtx, convID)
 
 	// Enviar evento de finalización
 	fmt.Fprintf(w, "event: done\ndata: {\"conversation_id\": %d}\n\n", convID)

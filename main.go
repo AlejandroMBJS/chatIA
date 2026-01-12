@@ -202,7 +202,43 @@ func initDB(dbPath string) (*sql.DB, error) {
 		log.Printf("[INFO] Base de datos inicializada correctamente")
 	}
 
+	// Siempre asegurar que exista el usuario admin
+	if err := ensureAdminUser(database); err != nil {
+		log.Printf("[WARN] Error asegurando usuario admin: %v", err)
+	}
+
 	return database, nil
+}
+
+// ensureAdminUser se asegura de que exista un usuario admin con las credenciales predeterminadas
+func ensureAdminUser(database *sql.DB) error {
+	// Verificar si existe el usuario admin
+	var count int
+	err := database.QueryRow("SELECT COUNT(*) FROM users WHERE nomina = 'admin'").Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		// Crear usuario admin (password: admin123)
+		// Hash generado con bcrypt cost 10
+		_, err = database.Exec(`
+			INSERT INTO users (nomina, password_hash, nombre, approved, is_admin)
+			VALUES ('admin', '$2a$10$Iw6JSavGrirhkkoDsvY9leKrgEHjH913k1e8/NixaGaffrq4sWgNK', 'Administrador', 1, 1)
+		`)
+		if err != nil {
+			return err
+		}
+		log.Printf("[INFO] Usuario admin creado automaticamente")
+	} else {
+		// Asegurar que el admin existente tenga los permisos correctos
+		_, err = database.Exec("UPDATE users SET is_admin = 1, approved = 1 WHERE nomina = 'admin'")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func loadTemplates() (*template.Template, error) {

@@ -1,4 +1,4 @@
-.PHONY: build run test clean dev sqlc docker-setup docker-start docker-stop docker-logs docker-reset
+.PHONY: build run test clean dev sqlc docker-setup docker-start docker-stop docker-restart docker-logs docker-reset
 
 BINARY=chat-empleados
 DB_FILE=chat.db
@@ -41,6 +41,12 @@ docker-start:
 
 docker-stop:
 	./scripts/stop.sh
+
+docker-restart:
+	./scripts/restart.sh
+
+docker-restart-rebuild:
+	./scripts/restart.sh --rebuild
 
 docker-logs:
 	./scripts/logs.sh

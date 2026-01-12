@@ -1,0 +1,18 @@
+2026/01/12 14:07:53 [INFO] Usuario admin creado automaticamente
+2026/01/12 14:07:53 [INFO] Cargados 17 filtros de seguridad activos
+2026/01/12 14:07:53 [INFO] ========================================
+2026/01/12 14:07:53 [INFO] AQUILA - IRIS IA Chat
+2026/01/12 14:07:53 [INFO] ========================================
+2026/01/12 14:07:53 [INFO] Servidor iniciando en puerto 9999
+2026/01/12 14:07:53 [INFO] Base de datos: ./chat.db
+2026/01/12 14:07:53 [INFO] Ollama URL: http://localhost:11434
+2026/01/12 14:07:53 [INFO] Modelo IA: deepseek-r1:14b
+2026/01/12 14:07:53 [INFO] Filtros de seguridad: true
+2026/01/12 14:07:53 [INFO] ========================================
+2026/01/12 14:07:53 [INFO] Usuario admin por defecto:
+2026/01/12 14:07:53 [INFO]   Nomina: admin
+2026/01/12 14:07:53 [INFO]   Password: admin123
+2026/01/12 14:07:53 [INFO] ========================================
+2026/01/12 14:07:53 [INFO] Ollama disponible en http://localhost:11434
+2026/01/12 14:07:53 [INFO] Ollama disponible y funcionando
+2026/01/12 14:07:56 [GET] /health [::1]

@@ -243,6 +243,8 @@ func (o *OllamaService) markUnavailable() {
 }
 
 func (o *OllamaService) ChatStream(ctx context.Context, messages []Message, userID int64, onChunk func(string) error) (*FilterResult, error) {
+	log.Printf("[DEBUG] ChatStream: iniciando para usuario %d", userID)
+
 	if len(messages) > 0 {
 		lastMsg := messages[len(messages)-1]
 		if lastMsg.Role == "user" {
@@ -279,17 +281,32 @@ func (o *OllamaService) ChatStream(ctx context.Context, messages []Message, user
 		return nil, fmt.Errorf("error serializando request: %w", err)
 	}
 
+	log.Printf("[DEBUG] ChatStream: enviando request a Ollama...")
+
+	// Cliente especial para streaming sin timeout global
+	streamClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			IdleConnTimeout:     90 * time.Second,
+			DisableCompression:  true,
+			MaxIdleConnsPerHost: 10,
+		},
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "POST", o.cfg.OllamaURL+"/api/chat", bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("error creando request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := o.client.Do(req)
+	resp, err := streamClient.Do(req)
 	if err != nil {
+		log.Printf("[DEBUG] ChatStream: error conectando: %v", err)
 		return nil, fmt.Errorf("error conectando con Ollama: %w", err)
 	}
 	defer resp.Body.Close()
+
+	log.Printf("[DEBUG] ChatStream: respuesta recibida, status=%d", resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

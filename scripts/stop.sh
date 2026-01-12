@@ -26,6 +26,7 @@ docker compose down
 echo ""
 echo "[OK] Servicio detenido"
 echo ""
-echo "Nota: Los datos de la base de datos se mantienen en el volumen 'giachat_iris-data'"
+echo "Nota: Los datos de la base de datos se mantienen en el volumen de Docker"
 echo "      Para iniciar de nuevo: ./scripts/start.sh"
+echo "      Para resetear la BD:   ./scripts/reset-db.sh"
 echo ""
