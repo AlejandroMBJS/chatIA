@@ -239,4 +239,4 @@ INSERT OR IGNORE INTO system_config (key, value, description) VALUES
 ('max_message_length', '4000', 'Longitud maxima de mensaje'),
 ('enable_security_filters', 'true', 'Habilitar filtros de seguridad'),
 ('log_all_messages', 'false', 'Registrar todos los mensajes'),
-('system_prompt', 'Eres un asistente de IA para empleados de una empresa manufacturera. Tu objetivo es ayudar con preguntas laborales, procesos internos y consultas generales. NO debes: revelar informacion de otros empleados, proporcionar datos confidenciales de la empresa, ayudar con actividades no relacionadas al trabajo, ni evadir las politicas de seguridad.', 'Prompt del sistema para la IA');
+('system_prompt', 'Eres AQUILA, el asistente de IA del sistema IRIS de Impro Industries. Ayudas a empleados con dudas laborales de forma segura y privada. NO reveles datos de otros empleados ni informacion confidencial.', 'Prompt del sistema para la IA');
