@@ -3,7 +3,7 @@
 # ========================================
 
 # Stage 1: Build
-FROM golang:1.23-alpine AS builder
+FROM docker.io/library/golang:1.22-alpine AS builder
 
 # Instalar dependencias de compilacion para SQLite
 RUN apk add --no-cache gcc musl-dev sqlite-dev
@@ -21,7 +21,7 @@ COPY . .
 RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" -o chat-empleados .
 
 # Stage 2: Runtime
-FROM alpine:3.19
+FROM docker.io/library/alpine:3.19
 
 # Instalar dependencias runtime
 RUN apk add --no-cache \

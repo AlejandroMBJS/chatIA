@@ -22,22 +22,20 @@ echo "Configurando permisos de scripts..."
 chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
 echo "[OK] Scripts configurados"
 
-# Verificar Docker
-echo ""
-echo "Verificando Docker..."
-if ! command -v docker &> /dev/null; then
-    echo "[ERROR] Docker no esta instalado"
-    echo "        Instala Docker: https://docs.docker.com/get-docker/"
+# Detectar si usar docker-compose o podman-compose
+if command -v podman-compose &> /dev/null; then
+    COMPOSE_CMD="podman-compose"
+    echo "[INFO] Usando podman-compose"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+    echo "[INFO] Usando docker-compose"
+elif docker compose version &> /dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+    echo "[INFO] Usando docker compose"
+else
+    echo "[ERROR] No se encontro docker-compose ni podman-compose"
     exit 1
 fi
-
-# Verificar Docker Compose
-if ! docker compose version &> /dev/null; then
-    echo "[ERROR] Docker Compose no esta disponible"
-    exit 1
-fi
-
-echo "[OK] Docker y Docker Compose disponibles"
 
 # Verificar que Ollama este corriendo en el host
 echo ""
@@ -67,7 +65,7 @@ echo "[OK] Directorio de datos listo"
 # Construir imagen Docker
 echo ""
 echo "Construyendo imagen Docker..."
-docker compose build
+$COMPOSE_CMD build
 
 echo ""
 echo "========================================"

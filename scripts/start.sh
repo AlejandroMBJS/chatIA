@@ -18,20 +18,32 @@ echo ""
 # Hacer ejecutables los scripts por si acaso
 chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
 
+# Detectar compose command
+if command -v podman-compose &> /dev/null; then
+    COMPOSE_CMD="podman-compose"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+else
+    echo "[ERROR] No se encontro docker-compose ni podman-compose"
+    exit 1
+fi
+
 # Verificar si ya esta corriendo
-if docker compose ps --status running 2>/dev/null | grep -q "iris-chat"; then
+if $COMPOSE_CMD ps 2>/dev/null | grep -q "iris-chat.*Up\|iris-chat.*running"; then
     echo "[INFO] El servicio ya esta corriendo"
     echo ""
-    docker compose ps
+    $COMPOSE_CMD ps
     echo ""
     echo "URL: http://localhost:9999"
     exit 0
 fi
 
 # Verificar si la imagen existe, si no, construirla
-if ! docker images | grep -q "iris-chat\|giachat"; then
+if ! podman images 2>/dev/null | grep -q "iris-chat\|giachat" && ! docker images 2>/dev/null | grep -q "iris-chat\|giachat"; then
     echo "[INFO] Imagen no encontrada, construyendo..."
-    docker compose build
+    $COMPOSE_CMD build
 fi
 
 # Verificar Ollama
@@ -49,7 +61,7 @@ mkdir -p "$PROJECT_DIR/data"
 
 # Iniciar servicio
 echo "Iniciando contenedor..."
-docker compose up -d
+$COMPOSE_CMD up -d
 
 # Esperar a que este listo
 echo "Esperando que el servicio este listo..."
@@ -66,7 +78,7 @@ for i in {1..30}; do
         echo "  Usuario: admin"
         echo "  Password: admin123"
         echo ""
-        echo "Para ver logs: docker compose logs -f"
+        echo "Para ver logs: $COMPOSE_CMD logs -f"
         echo "Para detener:  ./scripts/stop.sh"
         echo ""
         exit 0
@@ -77,5 +89,5 @@ done
 
 echo ""
 echo "[ERROR] El servicio no respondio en 30 segundos"
-echo "        Revisa los logs: docker compose logs"
+echo "        Revisa los logs: $COMPOSE_CMD logs"
 exit 1

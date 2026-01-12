@@ -10,9 +10,23 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
+# Detectar compose command
+if command -v podman-compose &> /dev/null; then
+    COMPOSE_CMD="podman-compose"
+    CONTAINER_CMD="podman"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+    CONTAINER_CMD="docker"
+elif docker compose version &> /dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+    CONTAINER_CMD="docker"
+else
+    echo "[ERROR] No se encontro docker-compose ni podman-compose"
+    exit 1
+fi
+
 # Obtener el nombre del proyecto de docker compose
 PROJECT_NAME=$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
-VOLUME_NAME="${PROJECT_NAME}_iris-data"
 
 echo "========================================"
 echo "  IRIS Chat - Resetear Base de Datos"
@@ -24,8 +38,6 @@ echo "  - Conversaciones"
 echo "  - Mensajes"
 echo "  - Configuracion"
 echo ""
-echo "Volumen a eliminar: $VOLUME_NAME"
-echo ""
 read -p "Estas seguro? (escribe 'SI' para confirmar): " confirm
 
 if [ "$confirm" != "SI" ]; then
@@ -36,14 +48,13 @@ fi
 
 echo ""
 echo "Deteniendo servicio..."
-docker compose down
+$COMPOSE_CMD down 2>/dev/null || true
 
 echo "Eliminando volumen de datos..."
-docker volume rm "$VOLUME_NAME" 2>/dev/null || true
-
-# Tambien intentar con nombre alternativo por si acaso
-docker volume rm "iris_iris-data" 2>/dev/null || true
-docker volume rm "giachat_iris-data" 2>/dev/null || true
+# Intentar varios nombres posibles de volumenes
+$CONTAINER_CMD volume rm "${PROJECT_NAME}_iris-data" 2>/dev/null || true
+$CONTAINER_CMD volume rm "iris_iris-data" 2>/dev/null || true
+$CONTAINER_CMD volume rm "giachat_iris-data" 2>/dev/null || true
 
 echo ""
 echo "[OK] Base de datos eliminada"

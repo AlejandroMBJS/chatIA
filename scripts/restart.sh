@@ -17,22 +17,32 @@ echo ""
 echo "[INFO] La base de datos se mantiene intacta"
 echo ""
 
-# Detener si esta corriendo
-if docker compose ps --status running 2>/dev/null | grep -q "iris-chat"; then
-    echo "Deteniendo servicio actual..."
-    docker compose down
-    sleep 2
+# Detectar compose command
+if command -v podman-compose &> /dev/null; then
+    COMPOSE_CMD="podman-compose"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+else
+    echo "[ERROR] No se encontro docker-compose ni podman-compose"
+    exit 1
 fi
+
+# Detener si esta corriendo
+echo "Deteniendo servicio actual..."
+$COMPOSE_CMD down 2>/dev/null || true
+sleep 2
 
 # Reconstruir si se solicita
 if [ "$1" == "--rebuild" ]; then
     echo "Reconstruyendo imagen..."
-    docker compose build
+    $COMPOSE_CMD build
 fi
 
 # Iniciar servicio
 echo "Iniciando servicio..."
-docker compose up -d
+$COMPOSE_CMD up -d
 
 # Esperar a que este listo
 echo "Esperando que el servicio este listo..."
@@ -55,5 +65,5 @@ done
 
 echo ""
 echo "[ERROR] El servicio no respondio en 30 segundos"
-echo "        Revisa los logs: docker compose logs"
+echo "        Revisa los logs: $COMPOSE_CMD logs"
 exit 1
