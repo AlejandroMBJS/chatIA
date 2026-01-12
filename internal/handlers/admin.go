@@ -371,3 +371,96 @@ func (h *AdminHandler) AdminChangePassword(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Contraseña actualizada"))
 }
+
+func (h *AdminHandler) ToggleUserAdmin(w http.ResponseWriter, r *http.Request) {
+	adminUser := middleware.GetUserFromContext(r.Context())
+
+	userIDStr := r.PathValue("id")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	targetUser, err := h.queries.GetUserByID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Usuario no encontrado", http.StatusNotFound)
+		return
+	}
+
+	// No permitir quitar admin al usuario admin principal
+	if targetUser.Nomina == "admin" {
+		http.Error(w, "No se puede modificar el usuario admin principal", http.StatusForbidden)
+		return
+	}
+
+	// Toggle admin status
+	newStatus := int64(1)
+	if targetUser.IsAdmin.Valid && targetUser.IsAdmin.Int64 == 1 {
+		newStatus = 0
+	}
+
+	_, err = h.queries.SetUserAdmin(r.Context(), db.SetUserAdminParams{
+		IsAdmin: newStatus,
+		ID:      userID,
+	})
+	if err != nil {
+		log.Printf("[ERROR] Error actualizando admin status: %v", err)
+		http.Error(w, "Error actualizando usuario", http.StatusInternalServerError)
+		return
+	}
+
+	status := "otorgado"
+	if newStatus == 0 {
+		status = "revocado"
+	}
+	log.Printf("[INFO] Admin %s %s rol admin a %s (%s)", adminUser.Nomina, status, targetUser.Nombre, targetUser.Nomina)
+
+	w.Header().Set("HX-Redirect", "/admin/users")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	adminUser := middleware.GetUserFromContext(r.Context())
+
+	userIDStr := r.PathValue("id")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	targetUser, err := h.queries.GetUserByID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Usuario no encontrado", http.StatusNotFound)
+		return
+	}
+
+	// No permitir eliminar al usuario admin principal
+	if targetUser.Nomina == "admin" {
+		http.Error(w, "No se puede eliminar el usuario admin principal", http.StatusForbidden)
+		return
+	}
+
+	// Primero eliminar sesiones del usuario
+	h.queries.DeleteUserSessions(r.Context(), userID)
+
+	// Luego eliminar el usuario
+	result, err := h.queries.DeleteUser(r.Context(), userID)
+	if err != nil {
+		log.Printf("[ERROR] Error eliminando usuario: %v", err)
+		http.Error(w, "Error eliminando usuario", http.StatusInternalServerError)
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		http.Error(w, "No se pudo eliminar el usuario", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[INFO] Admin %s eliminó usuario %s (%s)", adminUser.Nomina, targetUser.Nombre, targetUser.Nomina)
+
+	w.Header().Set("HX-Redirect", "/admin/users")
+	w.WriteHeader(http.StatusOK)
+}

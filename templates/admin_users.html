@@ -71,32 +71,46 @@
                     <th>Acciones</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody hx-target="closest tr" hx-swap="outerHTML">
                 {{range .AllUsers}}
-                <tr>
-                    <td>{{.Nomina}}</td>
+                <tr id="user-{{.ID}}">
+                    <td><strong>{{.Nomina}}</strong></td>
                     <td>{{.Nombre}}</td>
-                    <td>{{.Departamento.String}}</td>
+                    <td>{{if .Departamento.String}}{{.Departamento.String}}{{else}}-{{end}}</td>
                     <td>
-                        {{if eq .Approved 1}}
+                        {{if eq .Approved.Int64 1}}
                         <span class="status-badge status-approved">Aprobado</span>
                         {{else}}
                         <span class="status-badge status-pending">Pendiente</span>
                         {{end}}
                     </td>
                     <td>
-                        {{if eq .IsAdmin 1}}
+                        {{if eq .IsAdmin.Int64 1}}
                         <span class="role-badge role-admin">Admin</span>
                         {{else}}
                         <span class="role-badge role-user">Usuario</span>
                         {{end}}
                     </td>
-                    <td>{{.CreatedAt}}</td>
-                    <td class="actions">
+                    <td>{{formatDate .CreatedAt}}</td>
+                    <td class="actions user-actions">
+                        {{if ne .Approved.Int64 1}}
+                        <button hx-post="/admin/approve/{{.ID}}" class="btn btn-sm btn-success">Aprobar</button>
+                        {{end}}
+                        <button hx-post="/admin/user/{{.ID}}/toggle-admin"
+                                class="btn btn-sm {{if eq .IsAdmin.Int64 1}}btn-secondary{{else}}btn-primary{{end}}">
+                            {{if eq .IsAdmin.Int64 1}}Quitar Admin{{else}}Hacer Admin{{end}}
+                        </button>
                         <button class="btn btn-sm btn-warning"
                                 onclick="showPasswordModal({{.ID}}, '{{.Nombre}}')">
-                            Cambiar Contraseña
+                            Cambiar Pass
                         </button>
+                        {{if ne .Nomina "admin"}}
+                        <button hx-delete="/admin/user/{{.ID}}"
+                                hx-confirm="Eliminar usuario {{.Nombre}}? Esta accion no se puede deshacer."
+                                class="btn btn-sm btn-danger">
+                            Eliminar
+                        </button>
+                        {{end}}
                     </td>
                 </tr>
                 {{end}}

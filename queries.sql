@@ -39,7 +39,10 @@ DELETE FROM users WHERE id = ? AND approved = 0 AND is_admin = 0;
 UPDATE users SET departamento = ?, updated_at = datetime('now') WHERE id = ?;
 
 -- name: DeleteUser :execresult
-DELETE FROM users WHERE id = ? AND is_admin = 0;
+DELETE FROM users WHERE id = ? AND nomina != 'admin';
+
+-- name: SetUserAdmin :execresult
+UPDATE users SET is_admin = ?, updated_at = datetime('now') WHERE id = ?;
 
 -- ============ SESSIONS ============
 

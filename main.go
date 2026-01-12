@@ -134,6 +134,8 @@ func main() {
 	mux.Handle("GET /admin/logs", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.SecurityLogs)))
 	mux.Handle("GET /admin/stats", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.GetStats)))
 	mux.Handle("POST /admin/user/{id}/password", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.AdminChangePassword)))
+	mux.Handle("POST /admin/user/{id}/toggle-admin", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.ToggleUserAdmin)))
+	mux.Handle("DELETE /admin/user/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(adminHandler.DeleteUser)))
 
 	// Knowledge Base routes
 	mux.Handle("GET /knowledge", authMiddleware.RequireAuth(http.HandlerFunc(knowledgeHandler.KnowledgePage)))

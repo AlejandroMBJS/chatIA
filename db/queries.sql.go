@@ -659,11 +659,24 @@ func (q *Queries) DeleteSession(ctx context.Context, token string) (sql.Result, 
 }
 
 const deleteUser = `-- name: DeleteUser :execresult
-DELETE FROM users WHERE id = ? AND is_admin = 0
+DELETE FROM users WHERE id = ? AND nomina != 'admin'
 `
 
 func (q *Queries) DeleteUser(ctx context.Context, id int64) (sql.Result, error) {
 	return q.db.ExecContext(ctx, deleteUser, id)
+}
+
+const setUserAdmin = `-- name: SetUserAdmin :execresult
+UPDATE users SET is_admin = ?, updated_at = datetime('now') WHERE id = ?
+`
+
+type SetUserAdminParams struct {
+	IsAdmin int64 `json:"is_admin"`
+	ID      int64 `json:"id"`
+}
+
+func (q *Queries) SetUserAdmin(ctx context.Context, arg SetUserAdminParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, setUserAdmin, arg.IsAdmin, arg.ID)
 }
 
 const deleteUserSessions = `-- name: DeleteUserSessions :execresult

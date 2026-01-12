@@ -698,6 +698,10 @@ body {
     gap: 0.5rem;
 }
 
+.admin-table .user-actions {
+    flex-wrap: wrap;
+}
+
 .empty-message {
     text-align: center;
     color: var(--text-light);

@@ -57,6 +57,7 @@ type Querier interface {
 	DeleteSession(ctx context.Context, token string) (sql.Result, error)
 	DeleteUser(ctx context.Context, id int64) (sql.Result, error)
 	DeleteUserSessions(ctx context.Context, userID int64) (sql.Result, error)
+	SetUserAdmin(ctx context.Context, arg SetUserAdminParams) (sql.Result, error)
 	GetActiveFilterCategories(ctx context.Context) ([]FilterCategory, error)
 	GetActiveKnowledge(ctx context.Context) ([]GetActiveKnowledgeRow, error)
 	GetActiveSecurityFilters(ctx context.Context) ([]SecurityFilter, error)
