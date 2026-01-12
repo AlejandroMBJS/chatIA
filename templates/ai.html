@@ -85,7 +85,7 @@
                     <span>{{if eq .Lang "en"}}Processing...{{else}}Procesando...{{end}}</span>
                 </div>
 
-                <form id="ai-form" class="ai-input-form">
+                <form id="ai-form" class="ai-input-form" enctype="multipart/form-data">
                     <input type="hidden" name="conversation_id" value="{{if .CurrentConv}}{{.CurrentConv.ID}}{{else}}0{{end}}">
                     {{if not .CurrentConv}}
                     <div class="model-selector-row">
@@ -103,7 +103,16 @@
                         <small>{{if eq .Lang "en"}}Model{{else}}Modelo{{end}}: {{.Model}}</small>
                     </div>
                     {{end}}
+                    <div id="file-preview" class="file-preview" style="display: none;">
+                        <span class="file-name"></span>
+                        <button type="button" class="file-remove" onclick="removeFile()">&times;</button>
+                    </div>
                     <div class="input-row">
+                        <input type="file" name="file" id="file-input" class="file-input"
+                               accept=".txt,.md,.csv,.json,.xml,.html,.css,.js,.go,.py,.java,.c,.cpp,.h,.sql,.yaml,.yml,.toml,.ini,.log,.pdf,.docx">
+                        <button type="button" class="btn btn-secondary btn-attach" onclick="document.getElementById('file-input').click()" title="{{if eq .Lang "en"}}Attach file{{else}}Adjuntar archivo{{end}}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </button>
                         <textarea name="content" id="ai-input"
                                   placeholder="{{if eq .Lang "en"}}Write your message...{{else}}Escribe tu mensaje...{{end}}"
                                   rows="2" maxlength="4000"></textarea>
@@ -121,28 +130,67 @@
     </footer>
 
     <script>
+    // File handling functions (global scope)
+    function removeFile() {
+        const fileInput = document.getElementById('file-input');
+        const filePreview = document.getElementById('file-preview');
+        fileInput.value = '';
+        filePreview.style.display = 'none';
+    }
+
     (function() {
         const form = document.getElementById('ai-form');
         const input = document.getElementById('ai-input');
         const messages = document.getElementById('ai-messages');
         const loading = document.getElementById('ai-loading');
         const errorDiv = document.getElementById('ai-error');
+        const fileInput = document.getElementById('file-input');
+        const filePreview = document.getElementById('file-preview');
+        const fileName = filePreview.querySelector('.file-name');
         const lang = '{{.Lang}}';
 
         let currentAssistantDiv = null;
         let currentContentDiv = null;
 
+        // File input change handler
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const file = this.files[0];
+                fileName.textContent = file.name + ' (' + formatFileSize(file.size) + ')';
+                filePreview.style.display = 'flex';
+            } else {
+                filePreview.style.display = 'none';
+            }
+        });
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const content = input.value.trim();
-            if (!content) return;
+            const hasFile = fileInput.files && fileInput.files[0];
+
+            // Allow submit if there's content OR a file
+            if (!content && !hasFile) return;
 
             const formData = new FormData(form);
             const convId = formData.get('conversation_id');
 
-            addMessage('user', content);
+            // Show message with file indicator if present
+            let displayContent = content;
+            if (hasFile) {
+                displayContent = content ? content + ' [' + fileInput.files[0].name + ']' : '[' + fileInput.files[0].name + ']';
+            }
+            addMessage('user', displayContent);
+
             input.value = '';
+            fileInput.value = '';
+            filePreview.style.display = 'none';
             showLoading();
             hideError();
 

@@ -19,11 +19,12 @@ import (
 )
 
 type AIHandler struct {
-	queries   *db.Queries
-	templates *template.Template
-	ollama    *services.OllamaService
-	security  *services.SecurityService
-	scraper   *services.Scraper
+	queries       *db.Queries
+	templates     *template.Template
+	ollama        *services.OllamaService
+	security      *services.SecurityService
+	scraper       *services.Scraper
+	fileProcessor *services.FileProcessor
 }
 
 func NewAIHandler(queries *db.Queries, templates *template.Template, ollama *services.OllamaService, security *services.SecurityService) *AIHandler {
@@ -43,11 +44,12 @@ func NewAIHandler(queries *db.Queries, templates *template.Template, ollama *ser
 	}
 
 	return &AIHandler{
-		queries:   queries,
-		templates: templates,
-		ollama:    ollama,
-		security:  security,
-		scraper:   services.NewScraper(scraperConfig),
+		queries:       queries,
+		templates:     templates,
+		ollama:        ollama,
+		security:      security,
+		scraper:       services.NewScraper(scraperConfig),
+		fileProcessor: services.NewFileProcessor(),
 	}
 }
 
@@ -456,7 +458,28 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 	convIDStr := r.FormValue("conversation_id")
 	selectedModel := r.FormValue("model")
 
-	if content == "" {
+	// Process uploaded file if present
+	var fileContext string
+	if r.MultipartForm != nil {
+		files := r.MultipartForm.File["file"]
+		if len(files) > 0 {
+			fileHeader := files[0]
+			file, err := fileHeader.Open()
+			if err == nil {
+				defer file.Close()
+				processed, err := h.fileProcessor.ProcessFile(file, fileHeader)
+				if err != nil {
+					log.Printf("[WARN] Error processing file %s: %v", fileHeader.Filename, err)
+				} else {
+					fileContext = h.fileProcessor.FormatFileContext(processed)
+					log.Printf("[INFO] File processed: %s (%d chars)", processed.FileName, len(processed.Content))
+				}
+			}
+		}
+	}
+
+	// Allow empty content if file is attached
+	if content == "" && fileContext == "" {
 		http.Error(w, "El mensaje no puede estar vacio", http.StatusBadRequest)
 		return
 	}
@@ -467,6 +490,12 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	content = h.security.SanitizeForDisplay(content)
+
+	// Append file context to the message for AI processing
+	contentForAI := content
+	if fileContext != "" {
+		contentForAI = content + fileContext
+	}
 
 	var convID int64
 	var err error
@@ -545,10 +574,15 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	for _, msg := range history {
+	for i, msg := range history {
+		msgContent := msg.Content
+		// For the last user message, use contentForAI which includes file context
+		if i == len(history)-1 && msg.Role == "user" && fileContext != "" {
+			msgContent = contentForAI
+		}
 		messages = append(messages, services.Message{
 			Role:    msg.Role,
-			Content: msg.Content,
+			Content: msgContent,
 		})
 	}
 

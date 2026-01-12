@@ -637,6 +637,57 @@ body {
     resize: none;
 }
 
+/* File upload styles */
+.ai-input-form .file-input {
+    display: none;
+}
+
+.ai-input-form .btn-attach {
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ai-input-form .btn-attach svg {
+    width: 18px;
+    height: 18px;
+}
+
+.ai-input-form .file-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    color: var(--text);
+}
+
+.ai-input-form .file-preview .file-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-input-form .file-preview .file-remove {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0 0.25rem;
+}
+
+.ai-input-form .file-preview .file-remove:hover {
+    color: var(--text);
+}
+
 /* ========== ADMIN ========== */
 .admin-container {
     max-width: 1200px;
