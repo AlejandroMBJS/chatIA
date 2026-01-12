@@ -174,11 +174,6 @@ func main() {
 }
 
 func initDB(dbPath string) (*sql.DB, error) {
-	needsInit := false
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		needsInit = true
-	}
-
 	database, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, err
@@ -188,19 +183,19 @@ func initDB(dbPath string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	if needsInit {
-		log.Printf("[INFO] Inicializando base de datos...")
-		schemaPath := filepath.Join(".", "schema.sql")
-		schema, err := os.ReadFile(schemaPath)
-		if err != nil {
-			return nil, err
-		}
-
-		if _, err := database.Exec(string(schema)); err != nil {
-			return nil, err
-		}
-		log.Printf("[INFO] Base de datos inicializada correctamente")
+	// Siempre ejecutar schema.sql para crear tablas faltantes
+	// Todas las sentencias usan IF NOT EXISTS y INSERT OR IGNORE
+	log.Printf("[INFO] Verificando esquema de base de datos...")
+	schemaPath := filepath.Join(".", "schema.sql")
+	schema, err := os.ReadFile(schemaPath)
+	if err != nil {
+		return nil, err
 	}
+
+	if _, err := database.Exec(string(schema)); err != nil {
+		return nil, err
+	}
+	log.Printf("[INFO] Esquema de base de datos verificado")
 
 	// Siempre asegurar que exista el usuario admin
 	if err := ensureAdminUser(database); err != nil {

@@ -19,7 +19,11 @@ services:
       - DB_PATH=/data/chat.db
       # Para network_mode: host, usar localhost directamente
       - OLLAMA_URL=http://localhost:11434
-      - OLLAMA_MODEL=deepseek-r1:14b
+      # Modelos disponibles (descomenta el que prefieras):
+      # - OLLAMA_MODEL=deepseek-r1:14b    # Requiere ~9GB RAM
+      # - OLLAMA_MODEL=deepseek-r1:7b     # Requiere ~5GB RAM
+      # - OLLAMA_MODEL=llama3.2:3b        # Requiere ~3GB RAM (recomendado para poca RAM)
+      - OLLAMA_MODEL=llama3.2:3b
       - SESSION_DURATION=24h
       - ENABLE_SECURITY_FILTERS=true
       - FORCE_SECURE_COOKIE=false

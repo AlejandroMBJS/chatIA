@@ -409,9 +409,18 @@ func truncateTitle(content string) string {
 func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUserFromContext(r.Context())
 
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Error procesando formulario", http.StatusBadRequest)
-		return
+	// Soportar tanto application/x-www-form-urlencoded como multipart/form-data
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			http.Error(w, "Error procesando formulario", http.StatusBadRequest)
+			return
+		}
+	} else {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Error procesando formulario", http.StatusBadRequest)
+			return
+		}
 	}
 
 	content := strings.TrimSpace(r.FormValue("content"))
