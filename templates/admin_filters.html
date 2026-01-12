@@ -1,0 +1,165 @@
+{{define "content"}}
+<div class="admin-container">
+    <div class="admin-header">
+        <h1>Filtros de Seguridad</h1>
+        <div class="admin-nav">
+            <a href="/admin" class="btn btn-secondary">Dashboard</a>
+            <a href="/admin/users" class="btn btn-secondary">Usuarios</a>
+            <a href="/admin/filters" class="btn btn-primary">Filtros</a>
+            <a href="/admin/logs" class="btn btn-secondary">Logs</a>
+        </div>
+    </div>
+
+    {{if .Stats}}
+    <div class="stats-grid stats-small">
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.TotalViolations}}</div>
+            <div class="stat-label">Violaciones Totales</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.UniqueUsers}}</div>
+            <div class="stat-label">Usuarios Afectados</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.TodayViolations}}</div>
+            <div class="stat-label">Violaciones Hoy</div>
+        </div>
+    </div>
+    {{end}}
+
+    <section class="admin-section">
+        <div class="section-header">
+            <h2>Crear Nuevo Filtro</h2>
+        </div>
+        <form hx-post="/admin/filters/create" class="filter-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" name="name" required placeholder="nombre_del_filtro">
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select name="filter_type" required>
+                        <option value="keyword">Palabras clave (separadas por coma)</option>
+                        <option value="regex">Expresion regular</option>
+                        <option value="category">Categoria</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Patron</label>
+                <input type="text" name="pattern" required
+                       placeholder="Para keywords: palabra1,palabra2. Para regex: (?i)patron">
+            </div>
+
+            <div class="form-group">
+                <label>Descripcion</label>
+                <input type="text" name="description" placeholder="Descripcion del filtro">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Accion</label>
+                    <select name="action" required>
+                        <option value="block">Bloquear mensaje</option>
+                        <option value="warn">Advertir (permitir)</option>
+                        <option value="log">Solo registrar</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Aplica a</label>
+                    <select name="applies_to">
+                        <option value="both">Entrada y Salida</option>
+                        <option value="input">Solo Entrada (usuario)</option>
+                        <option value="output">Solo Salida (IA)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Severidad</label>
+                    <select name="severity">
+                        <option value="low">Baja</option>
+                        <option value="medium">Media</option>
+                        <option value="high">Alta</option>
+                        <option value="critical">Critica</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Crear Filtro</button>
+        </form>
+    </section>
+
+    <section class="admin-section">
+        <h2>Filtros Existentes ({{len .Filters}})</h2>
+        <div class="filters-list" hx-target="closest .filter-item" hx-swap="outerHTML">
+            {{range .Filters}}
+            <div class="filter-item {{if eq .IsActive 0}}filter-disabled{{end}}" id="filter-{{.ID}}">
+                <div class="filter-header">
+                    <h3>{{.Name}}</h3>
+                    <div class="filter-badges">
+                        <span class="type-badge">{{.FilterType}}</span>
+                        <span class="action-badge action-{{.Action}}">{{.Action}}</span>
+                        <span class="severity-badge severity-{{.Severity.String}}">{{.Severity.String}}</span>
+                        {{if eq .IsActive 1}}
+                        <span class="status-badge status-active">Activo</span>
+                        {{else}}
+                        <span class="status-badge status-inactive">Inactivo</span>
+                        {{end}}
+                    </div>
+                </div>
+                <div class="filter-details">
+                    <p class="filter-description">{{.Description.String}}</p>
+                    <p class="filter-pattern"><strong>Patron:</strong> <code>{{.Pattern}}</code></p>
+                    <p class="filter-applies"><strong>Aplica a:</strong> {{.AppliesTo.String}}</p>
+                    {{if .CreatedByName.String}}
+                    <p class="filter-creator"><strong>Creado por:</strong> {{.CreatedByName.String}}</p>
+                    {{end}}
+                </div>
+                <div class="filter-actions">
+                    <button hx-post="/admin/filters/toggle/{{.ID}}"
+                            class="btn btn-sm {{if eq .IsActive 1}}btn-warning{{else}}btn-success{{end}}">
+                        {{if eq .IsActive 1}}Desactivar{{else}}Activar{{end}}
+                    </button>
+                    <button hx-delete="/admin/filters/delete/{{.ID}}"
+                            hx-confirm="Eliminar este filtro permanentemente?"
+                            class="btn btn-sm btn-danger">
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+            {{else}}
+            <p class="empty-message">No hay filtros configurados</p>
+            {{end}}
+        </div>
+    </section>
+
+    <section class="admin-section">
+        <h2>Guia de Filtros</h2>
+        <div class="help-content">
+            <h4>Tipos de Filtro:</h4>
+            <ul>
+                <li><strong>Palabras clave:</strong> Lista separada por comas. Ej: <code>salario,nomina,confidencial</code></li>
+                <li><strong>Expresion regular:</strong> Patron regex. Ej: <code>(?i)contrase[nñ]a.*de</code></li>
+                <li><strong>Categoria:</strong> Texto simple para buscar.</li>
+            </ul>
+
+            <h4>Acciones:</h4>
+            <ul>
+                <li><strong>Bloquear:</strong> Impide el envio del mensaje completamente.</li>
+                <li><strong>Advertir:</strong> Registra pero permite el mensaje.</li>
+                <li><strong>Registrar:</strong> Solo guarda en logs sin notificar.</li>
+            </ul>
+
+            <h4>Ejemplos de Patrones Regex:</h4>
+            <ul>
+                <li><code>(?i)hackear</code> - Detecta "hackear" sin importar mayusculas</li>
+                <li><code>\b\d{16}\b</code> - Detecta numeros de 16 digitos (tarjetas)</li>
+                <li><code>(?i)(dame|muestrame).*datos.*de</code> - Detecta solicitudes de datos de otros</li>
+            </ul>
+        </div>
+    </section>
+</div>
+{{end}}
+
+{{template "base" .}}

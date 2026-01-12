@@ -1,18 +1,20 @@
-.PHONY: build run test clean dev sqlc
+.PHONY: build run test clean dev sqlc docker-setup docker-start docker-stop docker-logs docker-reset
 
 BINARY=chat-empleados
-DB_FILE=chat.db 
+DB_FILE=chat.db
 
-build: 
+# ========== Desarrollo local ==========
+
+build:
 	go build -o $(BINARY) .
 
 run: build
 	./$(BINARY)
 
-dev: 
+dev:
 	go run .
 
-test: 
+test:
 	go test ./... -v
 
 check:
@@ -20,12 +22,35 @@ check:
 	go vet ./...
 
 sqlc:
-	sqlc generate 
+	sqlc generate
 
 clean:
 	rm -f $(BINARY)
 
 reset-db:
 	rm -f $(DB_FILE)
-	sqlite3 $(DB_FILE) < schema.sql 
+	sqlite3 $(DB_FILE) < schema.sql
+
+# ========== Docker (produccion) ==========
+
+docker-setup:
+	./scripts/setup.sh
+
+docker-start:
+	./scripts/start.sh
+
+docker-stop:
+	./scripts/stop.sh
+
+docker-logs:
+	./scripts/logs.sh
+
+docker-reset:
+	./scripts/reset-db.sh
+
+docker-build:
+	docker compose build
+
+docker-rebuild:
+	docker compose build --no-cache
 

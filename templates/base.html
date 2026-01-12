@@ -1,0 +1,44 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - GIA Chat</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/ws.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    {{if .User}}
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/chat">GIA Chat</a>
+        </div>
+        <div class="nav-links">
+            <a href="/chat" class="nav-link">Chat Grupal</a>
+            <a href="/ai" class="nav-link">Chat IA</a>
+            {{if .User.IsAdmin}}
+            <a href="/admin" class="nav-link admin-link">Admin</a>
+            {{end}}
+        </div>
+        <div class="nav-user">
+            <span class="user-name">{{.User.Nombre}}</span>
+            <span class="user-nomina">({{.User.Nomina}})</span>
+            <form action="/logout" method="POST" class="logout-form">
+                <button type="submit" class="btn btn-logout">Salir</button>
+            </form>
+        </div>
+    </nav>
+    {{end}}
+
+    <main class="container">
+        {{template "content" .}}
+    </main>
+
+    <footer class="footer">
+        <p>GIA Chat - Sistema de Comunicacion Empresarial</p>
+    </footer>
+</body>
+</html>
+{{end}}

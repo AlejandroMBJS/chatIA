@@ -1,0 +1,55 @@
+# ========================================
+# IRIS Chat - Docker Compose
+# ========================================
+# Deploy: docker compose up --build
+# ========================================
+
+services:
+  iris-chat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iris-chat
+    restart: unless-stopped
+    ports:
+      - "9999:9999"
+    environment:
+      - PORT=9999
+      - DB_PATH=/data/chat.db
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=deepseek-r1:14b
+      - SESSION_DURATION=24h
+      - ENABLE_SECURITY_FILTERS=true
+      - FORCE_SECURE_COOKIE=false
+      - OLLAMA_TIMEOUT=5m
+      - OLLAMA_RETRIES=3
+    volumes:
+      # Volumen persistente para la base de datos SQLite
+      - iris-data:/data
+    extra_hosts:
+      # Permite al contenedor conectar con el host
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Límites de recursos (opcional, descomentar si es necesario)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 512M
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 128M
+
+volumes:
+  iris-data:
+    driver: local

@@ -1,0 +1,58 @@
+{{define "content"}}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Registro</h1>
+            <p>Crea tu cuenta de empleado</p>
+        </div>
+
+        {{if .Error}}
+        <div class="alert alert-error">
+            {{.Error}}
+        </div>
+        {{end}}
+
+        <form action="/register" method="POST" class="auth-form">
+            <div class="form-group">
+                <label for="nomina">Numero de Nomina</label>
+                <input type="text" id="nomina" name="nomina" required
+                       placeholder="Tu numero de nomina" autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="nombre">Nombre Completo</label>
+                <input type="text" id="nombre" name="nombre" required
+                       placeholder="Tu nombre completo">
+            </div>
+
+            <div class="form-group">
+                <label for="departamento">Departamento</label>
+                <input type="text" id="departamento" name="departamento"
+                       placeholder="Tu departamento (opcional)">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Contrasena</label>
+                <input type="password" id="password" name="password" required
+                       placeholder="Minimo 6 caracteres" autocomplete="new-password">
+            </div>
+
+            <div class="form-group">
+                <label for="password_confirm">Confirmar Contrasena</label>
+                <input type="password" id="password_confirm" name="password_confirm" required
+                       placeholder="Repite tu contrasena" autocomplete="new-password">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                Registrarse
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Ya tienes cuenta? <a href="/login">Inicia sesion aqui</a></p>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{template "base" .}}

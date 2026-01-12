@@ -1,0 +1,258 @@
+{{define "content"}}
+<div class="ai-container">
+    <div class="ai-sidebar">
+        <div class="sidebar-header">
+            <h3>Conversaciones</h3>
+            <a href="/ai/new" class="btn btn-sm btn-primary">Nueva</a>
+        </div>
+
+        <div class="conversation-list">
+            {{range .Conversations}}
+            <a href="/ai?conv={{.ID}}"
+               class="conversation-item {{if and $.CurrentConv (eq $.CurrentConv.ID .ID)}}active{{end}}">
+                <span class="conv-title">{{.Title.String}}</span>
+                <span class="conv-date">{{.UpdatedAt}}</span>
+            </a>
+            {{else}}
+            <p class="no-conversations">No hay conversaciones</p>
+            {{end}}
+        </div>
+
+        <div class="sidebar-footer">
+            {{if .OllamaAvailable}}
+            <span class="status-badge status-online">IA Disponible</span>
+            {{else}}
+            <span class="status-badge status-offline">IA No Disponible</span>
+            {{end}}
+            <small>Modelo: {{.Model}}</small>
+        </div>
+    </div>
+
+    <div class="ai-main">
+        <div class="ai-header">
+            {{if .CurrentConv}}
+            <h2>{{.CurrentConv.Title.String}}</h2>
+            <button hx-delete="/ai/conversation/{{.CurrentConv.ID}}"
+                    hx-confirm="Eliminar esta conversacion?"
+                    class="btn btn-sm btn-danger">Eliminar</button>
+            {{else}}
+            <h2>Chat con IA</h2>
+            {{end}}
+        </div>
+
+        <div id="ai-messages" class="ai-messages">
+            {{if .CurrentConv}}
+                {{range .Messages}}
+                <div class="ai-message {{if eq .Role "user"}}user-message{{else}}assistant-message{{end}} {{if .Filtered.Valid}}{{if eq .Filtered.Int64 1}}filtered-message{{end}}{{end}}">
+                    <div class="message-role">
+                        {{if eq .Role "user"}}Tu{{else}}IA{{end}}
+                    </div>
+                    <div class="message-content">
+                        {{if and .Filtered.Valid (eq .Filtered.Int64 1)}}
+                        <span class="filtered-badge">Filtrado: {{.FilterReason.String}}</span>
+                        {{end}}
+                        {{.Content}}
+                    </div>
+                </div>
+                {{end}}
+            {{else}}
+            <div class="ai-welcome">
+                <h3>Bienvenido al Chat con IA</h3>
+                <p>Inicia una nueva conversacion o selecciona una existente.</p>
+                <p><strong>Nota de seguridad:</strong> Tus conversaciones son privadas y estan protegidas por filtros de seguridad empresarial.</p>
+            </div>
+            {{end}}
+        </div>
+
+        <div id="ai-error" class="ai-error" style="display: none;"></div>
+        <div id="ai-loading" class="ai-loading" style="display: none;">
+            <span class="loading-spinner"></span>
+            <span>Procesando...</span>
+        </div>
+
+        <form id="ai-form" class="ai-input-form">
+            <input type="hidden" name="conversation_id" value="{{if .CurrentConv}}{{.CurrentConv.ID}}{{else}}0{{end}}">
+            <textarea name="content" id="ai-input"
+                      placeholder="Escribe tu mensaje..."
+                      rows="2" maxlength="4000"
+                      {{if not .OllamaAvailable}}disabled{{end}}></textarea>
+            <button type="submit" class="btn btn-primary"
+                    {{if not .OllamaAvailable}}disabled{{end}}>
+                Enviar
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    const form = document.getElementById('ai-form');
+    const input = document.getElementById('ai-input');
+    const messages = document.getElementById('ai-messages');
+    const loading = document.getElementById('ai-loading');
+    const errorDiv = document.getElementById('ai-error');
+
+    let currentAssistantDiv = null;
+    let currentContentDiv = null;
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const content = input.value.trim();
+        if (!content) return;
+
+        const formData = new FormData(form);
+        const convId = formData.get('conversation_id');
+
+        addMessage('user', content);
+        input.value = '';
+        showLoading();
+        hideError();
+
+        // Crear div para respuesta del asistente (streaming)
+        currentAssistantDiv = document.createElement('div');
+        currentAssistantDiv.className = 'ai-message assistant-message';
+        currentAssistantDiv.innerHTML = `
+            <div class="message-role">IA</div>
+            <div class="message-content streaming-content"></div>
+        `;
+        messages.appendChild(currentAssistantDiv);
+        currentContentDiv = currentAssistantDiv.querySelector('.streaming-content');
+        scrollToBottom();
+
+        try {
+            // Usar SSE para streaming
+            const response = await fetch('/ai/stream', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Error en la solicitud');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let newConvId = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('event: ')) {
+                        const eventType = line.slice(7);
+                        continue;
+                    }
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        try {
+                            const json = JSON.parse(data);
+
+                            if (json.conversation_id && !newConvId) {
+                                newConvId = json.conversation_id;
+                            }
+
+                            if (json.content) {
+                                currentContentDiv.textContent += json.content;
+                                scrollToBottom();
+                            }
+
+                            if (json.error) {
+                                showError(json.error);
+                            }
+
+                            if (json.reason) {
+                                // Mensaje filtrado
+                                currentAssistantDiv.classList.add('filtered-message');
+                                const badge = document.createElement('span');
+                                badge.className = 'filtered-badge';
+                                badge.textContent = 'Filtrado: ' + json.reason;
+                                currentContentDiv.insertBefore(badge, currentContentDiv.firstChild);
+                            }
+                        } catch (e) {
+                            // Ignorar líneas que no son JSON válido
+                        }
+                    }
+                }
+            }
+
+            // Si es una nueva conversación, redirigir
+            if (newConvId && convId === '0') {
+                window.location.href = '/ai?conv=' + newConvId;
+            }
+
+        } catch (err) {
+            showError('Error de conexion. Intenta de nuevo.');
+            if (currentAssistantDiv && !currentContentDiv.textContent) {
+                currentAssistantDiv.remove();
+            }
+        } finally {
+            hideLoading();
+            currentAssistantDiv = null;
+            currentContentDiv = null;
+        }
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    function addMessage(role, content, filtered = false, filterReason = '') {
+        const div = document.createElement('div');
+        div.className = `ai-message ${role}-message ${filtered ? 'filtered-message' : ''}`;
+
+        let html = `<div class="message-role">${role === 'user' ? 'Tu' : 'IA'}</div>`;
+        html += `<div class="message-content">`;
+        if (filtered) {
+            html += `<span class="filtered-badge">Filtrado: ${escapeHtml(filterReason)}</span>`;
+        }
+        html += escapeHtml(content);
+        html += `</div>`;
+
+        div.innerHTML = html;
+        messages.appendChild(div);
+        scrollToBottom();
+    }
+
+    function showLoading() {
+        loading.style.display = 'flex';
+    }
+
+    function hideLoading() {
+        loading.style.display = 'none';
+    }
+
+    function showError(msg) {
+        errorDiv.textContent = msg;
+        errorDiv.style.display = 'block';
+    }
+
+    function hideError() {
+        errorDiv.style.display = 'none';
+    }
+
+    function scrollToBottom() {
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    scrollToBottom();
+})();
+</script>
+{{end}}
+
+{{template "base" .}}

@@ -1,0 +1,84 @@
+{{define "content"}}
+<div class="profile-container">
+    <div class="profile-card">
+        <h1>Mi Perfil</h1>
+
+        <div class="profile-info">
+            <div class="info-row">
+                <label>Nombre:</label>
+                <span>{{.User.Nombre}}</span>
+            </div>
+            <div class="info-row">
+                <label>Nomina:</label>
+                <span>{{.User.Nomina}}</span>
+            </div>
+            <div class="info-row">
+                <label>Departamento:</label>
+                <span>{{if .User.Departamento}}{{.User.Departamento}}{{else}}No especificado{{end}}</span>
+            </div>
+            <div class="info-row">
+                <label>Rol:</label>
+                <span>
+                    {{if .User.IsAdmin}}
+                    <span class="role-badge role-admin">Administrador</span>
+                    {{else}}
+                    <span class="role-badge role-user">Usuario</span>
+                    {{end}}
+                </span>
+            </div>
+        </div>
+
+        <div class="profile-actions">
+            <a href="/chat" class="btn btn-primary">Ir al Chat</a>
+            <a href="/ai" class="btn btn-secondary">Chat con IA</a>
+        </div>
+    </div>
+</div>
+
+<style>
+.profile-container {
+    max-width: 500px;
+    margin: 2rem auto;
+}
+
+.profile-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 2rem;
+}
+
+.profile-card h1 {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.profile-info {
+    margin-bottom: 1.5rem;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-row label {
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.profile-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+</style>
+{{end}}
+
+{{template "base" .}}

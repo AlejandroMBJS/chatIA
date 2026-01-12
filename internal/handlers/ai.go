@@ -1,0 +1,493 @@
+package handlers
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"chat-empleados/db"
+	"chat-empleados/internal/middleware"
+	"chat-empleados/internal/services"
+)
+
+type AIHandler struct {
+	queries   *db.Queries
+	templates *template.Template
+	ollama    *services.OllamaService
+	security  *services.SecurityService
+}
+
+func NewAIHandler(queries *db.Queries, templates *template.Template, ollama *services.OllamaService, security *services.SecurityService) *AIHandler {
+	return &AIHandler{
+		queries:   queries,
+		templates: templates,
+		ollama:    ollama,
+		security:  security,
+	}
+}
+
+func (h *AIHandler) AIPage(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r.Context())
+
+	conversations, err := h.queries.GetUserConversations(r.Context(), user.ID)
+	if err != nil {
+		log.Printf("[ERROR] Error obteniendo conversaciones: %v", err)
+	}
+
+	var currentConv *db.AiConversation
+	var messages []db.GetConversationMessagesRow
+
+	convIDStr := r.URL.Query().Get("conv")
+	if convIDStr != "" {
+		convID, err := strconv.ParseInt(convIDStr, 10, 64)
+		if err == nil {
+			conv, err := h.queries.GetConversation(r.Context(), db.GetConversationParams{
+				ID:     convID,
+				UserID: user.ID,
+			})
+			if err == nil {
+				currentConv = &conv
+				messages, _ = h.queries.GetConversationMessages(r.Context(), convID)
+			}
+		}
+	}
+
+	ollamaAvailable := h.ollama.IsAvailable(r.Context())
+
+	data := map[string]interface{}{
+		"Title":            "Chat con IA",
+		"User":             user,
+		"Conversations":    conversations,
+		"CurrentConv":      currentConv,
+		"Messages":         messages,
+		"OllamaAvailable":  ollamaAvailable,
+		"Model":            h.ollama.GetModel(),
+	}
+	h.templates.ExecuteTemplate(w, "ai.html", data)
+}
+
+func (h *AIHandler) NewConversation(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r.Context())
+
+	conv, err := h.queries.CreateAIConversation(r.Context(), db.CreateAIConversationParams{
+		UserID: user.ID,
+		Title:  sql.NullString{String: "Nueva conversacion", Valid: true},
+	})
+	if err != nil {
+		log.Printf("[ERROR] Error creando conversacion: %v", err)
+		http.Error(w, "Error creando conversacion", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/ai?conv=%d", conv.ID), http.StatusSeeOther)
+}
+
+func (h *AIHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r.Context())
+
+	if err := r.ParseForm(); err != nil {
+		sendAIError(w, "Error procesando formulario")
+		return
+	}
+
+	content := strings.TrimSpace(r.FormValue("content"))
+	convIDStr := r.FormValue("conversation_id")
+
+	if content == "" {
+		sendAIError(w, "El mensaje no puede estar vacio")
+		return
+	}
+
+	if len(content) > 4000 {
+		sendAIError(w, "El mensaje es demasiado largo")
+		return
+	}
+
+	content = h.security.SanitizeForDisplay(content)
+
+	var convID int64
+	var err error
+
+	if convIDStr == "" || convIDStr == "0" {
+		conv, err := h.queries.CreateAIConversation(r.Context(), db.CreateAIConversationParams{
+			UserID: user.ID,
+			Title:  sql.NullString{String: truncateTitle(content), Valid: true},
+		})
+		if err != nil {
+			log.Printf("[ERROR] Error creando conversacion: %v", err)
+			sendAIError(w, "Error creando conversacion")
+			return
+		}
+		convID = conv.ID
+	} else {
+		convID, err = strconv.ParseInt(convIDStr, 10, 64)
+		if err != nil {
+			sendAIError(w, "ID de conversacion invalido")
+			return
+		}
+
+		hasAccess, err := h.security.ValidateConversationAccess(r.Context(), convID, user.ID)
+		if err != nil || !hasAccess {
+			log.Printf("[SECURITY] Usuario %s intento acceder a conversacion %d sin permiso", user.Nomina, convID)
+			sendAIError(w, "No tienes acceso a esta conversacion")
+			return
+		}
+	}
+
+	_, err = h.queries.CreateAIMessage(r.Context(), db.CreateAIMessageParams{
+		ConversationID: convID,
+		Role:           "user",
+		Content:        content,
+		Filtered:       sql.NullInt64{Int64: 0, Valid: true},
+		FilterReason:   sql.NullString{String: "", Valid: true},
+	})
+	if err != nil {
+		log.Printf("[ERROR] Error guardando mensaje usuario: %v", err)
+		sendAIError(w, "Error guardando mensaje")
+		return
+	}
+
+	history, err := h.queries.GetConversationMessages(r.Context(), convID)
+	if err != nil {
+		log.Printf("[ERROR] Error obteniendo historial: %v", err)
+		sendAIError(w, "Error obteniendo historial")
+		return
+	}
+
+	messages := make([]services.Message, 0, len(history))
+	for _, msg := range history {
+		messages = append(messages, services.Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		})
+	}
+
+	response, filterResult, err := h.ollama.Chat(r.Context(), messages, user.ID)
+	if err != nil {
+		log.Printf("[ERROR] Error llamando a Ollama: %v", err)
+		sendAIError(w, "Error comunicando con la IA. Verifica que Ollama este ejecutandose.")
+		return
+	}
+
+	if filterResult != nil && filterResult.Blocked {
+		_, err = h.queries.CreateAIMessage(r.Context(), db.CreateAIMessageParams{
+			ConversationID: convID,
+			Role:           "assistant",
+			Content:        "Lo siento, no puedo procesar esa solicitud por politicas de seguridad.",
+			Filtered:       sql.NullInt64{Int64: 1, Valid: true},
+			FilterReason:   sql.NullString{String: filterResult.FilterName, Valid: true},
+		})
+		if err != nil {
+			log.Printf("[ERROR] Error guardando respuesta filtrada: %v", err)
+		}
+
+		h.security.LogViolation(
+			r.Context(),
+			user.ID,
+			sql.NullInt64{Int64: filterResult.FilterID, Valid: true},
+			content,
+			filterResult.Action,
+			r.RemoteAddr,
+			r.UserAgent(),
+		)
+
+		sendAIResponse(w, convID, "Lo siento, no puedo procesar esa solicitud por politicas de seguridad.", true, filterResult.Reason)
+		return
+	}
+
+	_, err = h.queries.CreateAIMessage(r.Context(), db.CreateAIMessageParams{
+		ConversationID: convID,
+		Role:           "assistant",
+		Content:        response,
+		Filtered:       sql.NullInt64{Int64: 0, Valid: true},
+		FilterReason:   sql.NullString{String: "", Valid: true},
+	})
+	if err != nil {
+		log.Printf("[ERROR] Error guardando respuesta IA: %v", err)
+	}
+
+	h.queries.TouchConversation(r.Context(), convID)
+
+	sendAIResponse(w, convID, response, false, "")
+}
+
+func (h *AIHandler) DeleteConversation(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r.Context())
+
+	convIDStr := r.PathValue("id")
+	convID, err := strconv.ParseInt(convIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	hasAccess, err := h.security.ValidateConversationAccess(r.Context(), convID, user.ID)
+	if err != nil || !hasAccess {
+		http.Error(w, "No autorizado", http.StatusForbidden)
+		return
+	}
+
+	_, err = h.queries.DeleteConversation(r.Context(), db.DeleteConversationParams{
+		ID:     convID,
+		UserID: user.ID,
+	})
+	if err != nil {
+		log.Printf("[ERROR] Error eliminando conversacion: %v", err)
+		http.Error(w, "Error eliminando conversacion", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/ai")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *AIHandler) GetConversationMessages(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r.Context())
+
+	convIDStr := r.PathValue("id")
+	convID, err := strconv.ParseInt(convIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	hasAccess, err := h.security.ValidateConversationAccess(r.Context(), convID, user.ID)
+	if err != nil || !hasAccess {
+		http.Error(w, "No autorizado", http.StatusForbidden)
+		return
+	}
+
+	messages, err := h.queries.GetConversationMessages(r.Context(), convID)
+	if err != nil {
+		http.Error(w, "Error obteniendo mensajes", http.StatusInternalServerError)
+		return
+	}
+
+	h.templates.ExecuteTemplate(w, "ai_messages.html", map[string]interface{}{
+		"Messages": messages,
+		"ConvID":   convID,
+	})
+}
+
+type AIResponseData struct {
+	ConversationID int64  `json:"conversation_id"`
+	Response       string `json:"response"`
+	Filtered       bool   `json:"filtered"`
+	FilterReason   string `json:"filter_reason,omitempty"`
+	Error          string `json:"error,omitempty"`
+}
+
+func sendAIResponse(w http.ResponseWriter, convID int64, response string, filtered bool, filterReason string) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(AIResponseData{
+		ConversationID: convID,
+		Response:       response,
+		Filtered:       filtered,
+		FilterReason:   filterReason,
+	})
+}
+
+func sendAIError(w http.ResponseWriter, errorMsg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(AIResponseData{
+		Error: errorMsg,
+	})
+}
+
+func truncateTitle(content string) string {
+	content = strings.TrimSpace(content)
+	if len(content) > 50 {
+		return content[:47] + "..."
+	}
+	return content
+}
+
+// SendMessageStream maneja el envío de mensajes con streaming SSE
+func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUserFromContext(r.Context())
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Error procesando formulario", http.StatusBadRequest)
+		return
+	}
+
+	content := strings.TrimSpace(r.FormValue("content"))
+	convIDStr := r.FormValue("conversation_id")
+
+	if content == "" {
+		http.Error(w, "El mensaje no puede estar vacio", http.StatusBadRequest)
+		return
+	}
+
+	if len(content) > 4000 {
+		http.Error(w, "El mensaje es demasiado largo", http.StatusBadRequest)
+		return
+	}
+
+	content = h.security.SanitizeForDisplay(content)
+
+	var convID int64
+	var err error
+
+	if convIDStr == "" || convIDStr == "0" {
+		conv, err := h.queries.CreateAIConversation(r.Context(), db.CreateAIConversationParams{
+			UserID: user.ID,
+			Title:  sql.NullString{String: truncateTitle(content), Valid: true},
+		})
+		if err != nil {
+			log.Printf("[ERROR] Error creando conversacion: %v", err)
+			http.Error(w, "Error creando conversacion", http.StatusInternalServerError)
+			return
+		}
+		convID = conv.ID
+	} else {
+		convID, err = strconv.ParseInt(convIDStr, 10, 64)
+		if err != nil {
+			http.Error(w, "ID de conversacion invalido", http.StatusBadRequest)
+			return
+		}
+
+		hasAccess, err := h.security.ValidateConversationAccess(r.Context(), convID, user.ID)
+		if err != nil || !hasAccess {
+			log.Printf("[SECURITY] Usuario %s intento acceder a conversacion %d sin permiso", user.Nomina, convID)
+			http.Error(w, "No tienes acceso a esta conversacion", http.StatusForbidden)
+			return
+		}
+	}
+
+	// Guardar mensaje del usuario
+	_, err = h.queries.CreateAIMessage(r.Context(), db.CreateAIMessageParams{
+		ConversationID: convID,
+		Role:           "user",
+		Content:        content,
+		Filtered:       sql.NullInt64{Int64: 0, Valid: true},
+		FilterReason:   sql.NullString{String: "", Valid: true},
+	})
+	if err != nil {
+		log.Printf("[ERROR] Error guardando mensaje usuario: %v", err)
+		http.Error(w, "Error guardando mensaje", http.StatusInternalServerError)
+		return
+	}
+
+	// Obtener historial
+	history, err := h.queries.GetConversationMessages(r.Context(), convID)
+	if err != nil {
+		log.Printf("[ERROR] Error obteniendo historial: %v", err)
+		http.Error(w, "Error obteniendo historial", http.StatusInternalServerError)
+		return
+	}
+
+	messages := make([]services.Message, 0, len(history))
+	for _, msg := range history {
+		messages = append(messages, services.Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		})
+	}
+
+	// Configurar SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // Nginx
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming no soportado", http.StatusInternalServerError)
+		return
+	}
+
+	// Enviar evento inicial con ID de conversación
+	fmt.Fprintf(w, "event: start\ndata: {\"conversation_id\": %d}\n\n", convID)
+	flusher.Flush()
+
+	var fullResponse strings.Builder
+
+	// Streaming de respuesta
+	filterResult, err := h.ollama.ChatStream(r.Context(), messages, user.ID, func(chunk string) error {
+		fullResponse.WriteString(chunk)
+
+		// Enviar chunk como evento SSE
+		data := map[string]string{"content": chunk}
+		jsonData, _ := json.Marshal(data)
+		fmt.Fprintf(w, "event: chunk\ndata: %s\n\n", jsonData)
+		flusher.Flush()
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("[ERROR] Error en streaming Ollama: %v", err)
+		fmt.Fprintf(w, "event: error\ndata: {\"error\": \"Error comunicando con la IA\"}\n\n")
+		flusher.Flush()
+		return
+	}
+
+	response := fullResponse.String()
+
+	// Verificar si fue filtrado
+	if filterResult != nil && filterResult.Blocked {
+		response = "Lo siento, no puedo procesar esa solicitud por politicas de seguridad."
+
+		_, err = h.queries.CreateAIMessage(r.Context(), db.CreateAIMessageParams{
+			ConversationID: convID,
+			Role:           "assistant",
+			Content:        response,
+			Filtered:       sql.NullInt64{Int64: 1, Valid: true},
+			FilterReason:   sql.NullString{String: filterResult.FilterName, Valid: true},
+		})
+
+		h.security.LogViolation(
+			r.Context(),
+			user.ID,
+			sql.NullInt64{Int64: filterResult.FilterID, Valid: true},
+			content,
+			filterResult.Action,
+			r.RemoteAddr,
+			r.UserAgent(),
+		)
+
+		fmt.Fprintf(w, "event: filtered\ndata: {\"reason\": \"%s\"}\n\n", filterResult.Reason)
+		flusher.Flush()
+	} else {
+		// Guardar respuesta normal
+		_, err = h.queries.CreateAIMessage(r.Context(), db.CreateAIMessageParams{
+			ConversationID: convID,
+			Role:           "assistant",
+			Content:        response,
+			Filtered:       sql.NullInt64{Int64: 0, Valid: true},
+			FilterReason:   sql.NullString{String: "", Valid: true},
+		})
+		if err != nil {
+			log.Printf("[ERROR] Error guardando respuesta IA: %v", err)
+		}
+	}
+
+	h.queries.TouchConversation(r.Context(), convID)
+
+	// Enviar evento de finalización
+	fmt.Fprintf(w, "event: done\ndata: {\"conversation_id\": %d}\n\n", convID)
+	flusher.Flush()
+}
+
+// HealthCheck endpoint para verificar estado del servicio de IA
+func (h *AIHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	status := map[string]interface{}{
+		"ollama_available": h.ollama.IsAvailable(ctx),
+		"model":            h.ollama.GetModel(),
+		"timestamp":        time.Now().Format(time.RFC3339),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}

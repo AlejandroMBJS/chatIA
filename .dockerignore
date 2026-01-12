@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Archivos de base de datos local
+*.db
+*.db-wal
+*.db-shm
+chat.db*
+
+# Binarios
+chat-empleados
+*.exe
+
+# IDE y editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Archivos de test
+*_test.go
+coverage.out
+coverage.html
+
+# Documentación
+*.md
+!README.md
+
+# Claude/AI
+.claude/
+
+# Otros
+.env
+.env.local
+.DS_Store
+Thumbs.db

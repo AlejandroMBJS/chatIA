@@ -1,0 +1,123 @@
+{{define "content"}}
+<div class="admin-container">
+    <div class="admin-header">
+        <h1>Panel de Administracion</h1>
+        <div class="admin-nav">
+            <a href="/admin" class="btn btn-primary">Dashboard</a>
+            <a href="/admin/users" class="btn btn-secondary">Usuarios</a>
+            <a href="/admin/filters" class="btn btn-secondary">Filtros</a>
+            <a href="/admin/logs" class="btn btn-secondary">Logs</a>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        {{if .Stats}}
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.TotalUsers}}</div>
+            <div class="stat-label">Usuarios Activos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.PendingUsers}}</div>
+            <div class="stat-label">Pendientes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.TotalConversations}}</div>
+            <div class="stat-label">Conversaciones IA</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.SecurityIncidentsToday}}</div>
+            <div class="stat-label">Incidentes Hoy</div>
+        </div>
+        {{end}}
+    </div>
+
+    <div class="admin-sections">
+        <section class="admin-section">
+            <h2>Usuarios Pendientes de Aprobacion</h2>
+            {{if .PendingUsers}}
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Nomina</th>
+                        <th>Nombre</th>
+                        <th>Departamento</th>
+                        <th>Fecha Registro</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="pending-users">
+                    {{range .PendingUsers}}
+                    <tr id="user-row-{{.ID}}">
+                        <td>{{.Nomina}}</td>
+                        <td>{{.Nombre}}</td>
+                        <td>{{.Departamento.String}}</td>
+                        <td>{{.CreatedAt}}</td>
+                        <td class="actions">
+                            <button hx-post="/admin/approve/{{.ID}}"
+                                    hx-target="#user-row-{{.ID}}"
+                                    hx-swap="outerHTML"
+                                    class="btn btn-sm btn-success">Aprobar</button>
+                            <button hx-post="/admin/reject/{{.ID}}"
+                                    hx-target="#user-row-{{.ID}}"
+                                    hx-swap="outerHTML"
+                                    hx-confirm="Rechazar a este usuario?"
+                                    class="btn btn-sm btn-danger">Rechazar</button>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            {{else}}
+            <p class="empty-message">No hay usuarios pendientes de aprobacion</p>
+            {{end}}
+        </section>
+
+        <section class="admin-section">
+            <div class="section-header">
+                <h2>Incidentes de Seguridad Recientes</h2>
+                <a href="/admin/logs" class="btn btn-sm btn-secondary">Ver todos</a>
+            </div>
+            {{if .RecentLogs}}
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Usuario</th>
+                        <th>Filtro</th>
+                        <th>Severidad</th>
+                        <th>Accion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .RecentLogs}}
+                    <tr>
+                        <td>{{.CreatedAt}}</td>
+                        <td>{{.Nombre}} ({{.Nomina}})</td>
+                        <td>{{.FilterName.String}}</td>
+                        <td>
+                            <span class="severity-badge severity-{{.Severity.String}}">
+                                {{.Severity.String}}
+                            </span>
+                        </td>
+                        <td>{{.ActionTaken}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            {{else}}
+            <p class="empty-message">No hay incidentes de seguridad recientes</p>
+            {{end}}
+        </section>
+
+        <section class="admin-section">
+            <div class="section-header">
+                <h2>Filtros de Seguridad</h2>
+                <a href="/admin/filters" class="btn btn-sm btn-secondary">Gestionar</a>
+            </div>
+            <p>{{.FilterCount}} filtros activos protegiendo el sistema.</p>
+        </section>
+    </div>
+</div>
+{{end}}
+
+{{template "base" .}}

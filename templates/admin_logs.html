@@ -1,0 +1,109 @@
+{{define "content"}}
+<div class="admin-container">
+    <div class="admin-header">
+        <h1>Logs de Seguridad</h1>
+        <div class="admin-nav">
+            <a href="/admin" class="btn btn-secondary">Dashboard</a>
+            <a href="/admin/users" class="btn btn-secondary">Usuarios</a>
+            <a href="/admin/filters" class="btn btn-secondary">Filtros</a>
+            <a href="/admin/logs" class="btn btn-primary">Logs</a>
+        </div>
+    </div>
+
+    {{if .Stats}}
+    <div class="stats-grid stats-small">
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.TotalViolations}}</div>
+            <div class="stat-label">Total Violaciones</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.UniqueUsers}}</div>
+            <div class="stat-label">Usuarios Unicos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{.Stats.TodayViolations}}</div>
+            <div class="stat-label">Violaciones Hoy</div>
+        </div>
+    </div>
+    {{end}}
+
+    <section class="admin-section">
+        <h2>Registro de Incidentes</h2>
+        {{if .Logs}}
+        <table class="admin-table logs-table">
+            <thead>
+                <tr>
+                    <th>Fecha/Hora</th>
+                    <th>Usuario</th>
+                    <th>Filtro</th>
+                    <th>Severidad</th>
+                    <th>Accion</th>
+                    <th>Contenido</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Logs}}
+                <tr class="log-row severity-row-{{.Severity.String}}">
+                    <td class="log-date">{{.CreatedAt}}</td>
+                    <td>
+                        <strong>{{.Nombre}}</strong><br>
+                        <small>{{.Nomina}}</small>
+                    </td>
+                    <td>{{.FilterName.String}}</td>
+                    <td>
+                        <span class="severity-badge severity-{{.Severity.String}}">
+                            {{.Severity.String}}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="action-badge action-{{.ActionTaken}}">
+                            {{.ActionTaken}}
+                        </span>
+                    </td>
+                    <td class="log-content">
+                        <details>
+                            <summary>Ver contenido</summary>
+                            <pre>{{.OriginalContent}}</pre>
+                        </details>
+                    </td>
+                    <td class="log-ip">{{.IpAddress.String}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p class="empty-message">No hay registros de incidentes de seguridad</p>
+        {{end}}
+    </section>
+
+    <section class="admin-section">
+        <h2>Informacion sobre Logs</h2>
+        <div class="help-content">
+            <h4>Niveles de Severidad:</h4>
+            <ul>
+                <li><span class="severity-badge severity-low">low</span> - Bajo impacto, informativo</li>
+                <li><span class="severity-badge severity-medium">medium</span> - Impacto moderado, requiere atencion</li>
+                <li><span class="severity-badge severity-high">high</span> - Alto impacto, revisar pronto</li>
+                <li><span class="severity-badge severity-critical">critical</span> - Critico, posible intento malicioso</li>
+            </ul>
+
+            <h4>Tipos de Acciones:</h4>
+            <ul>
+                <li><span class="action-badge action-block">block</span> - Mensaje bloqueado completamente</li>
+                <li><span class="action-badge action-warn">warn</span> - Advertencia registrada, mensaje permitido</li>
+                <li><span class="action-badge action-log">log</span> - Solo registrado para auditoria</li>
+            </ul>
+
+            <h4>Recomendaciones:</h4>
+            <ul>
+                <li>Revisa incidentes de severidad <strong>critical</strong> y <strong>high</strong> diariamente</li>
+                <li>Multiples violaciones del mismo usuario pueden indicar intento malicioso</li>
+                <li>Usa los filtros para ajustar la sensibilidad del sistema</li>
+            </ul>
+        </div>
+    </section>
+</div>
+{{end}}
+
+{{template "base" .}}

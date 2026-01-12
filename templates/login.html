@@ -1,0 +1,40 @@
+{{define "content"}}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>GIA Chat</h1>
+            <p>Sistema de Comunicacion Empresarial</p>
+        </div>
+
+        {{if .Error}}
+        <div class="alert alert-error">
+            {{.Error}}
+        </div>
+        {{end}}
+
+        <form action="/login" method="POST" class="auth-form">
+            <div class="form-group">
+                <label for="nomina">Numero de Nomina</label>
+                <input type="text" id="nomina" name="nomina" required
+                       placeholder="Ingresa tu nomina" autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Contrasena</label>
+                <input type="password" id="password" name="password" required
+                       placeholder="Ingresa tu contrasena" autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                Iniciar Sesion
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>No tienes cuenta? <a href="/register">Registrate aqui</a></p>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{template "base" .}}
