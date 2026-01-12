@@ -3,9 +3,9 @@
 # ========================================
 
 # Stage 1: Build
-FROM golang:1.24-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
-# Instalar dependencias de compilación para SQLite
+# Instalar dependencias de compilacion para SQLite
 RUN apk add --no-cache gcc musl-dev sqlite-dev
 
 WORKDIR /app
@@ -14,7 +14,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copiar código fuente
+# Copiar codigo fuente
 COPY . .
 
 # Compilar con CGO habilitado (necesario para SQLite)
@@ -27,7 +27,8 @@ FROM alpine:3.19
 RUN apk add --no-cache \
     sqlite \
     ca-certificates \
-    tzdata
+    tzdata \
+    curl
 
 # Crear usuario no-root para seguridad
 RUN addgroup -g 1000 appgroup && \
@@ -38,10 +39,10 @@ WORKDIR /app
 # Copiar binario desde el builder
 COPY --from=builder /app/chat-empleados .
 
-# Copiar schema para inicialización de DB
+# Copiar schema para inicializacion de DB
 COPY --from=builder /app/schema.sql .
 
-# Crear directorio para datos
+# Crear directorio para datos y asegurar permisos
 RUN mkdir -p /data && chown -R appuser:appgroup /data /app
 
 # Cambiar a usuario no-root
@@ -58,12 +59,12 @@ ENV PORT=9999 \
     OLLAMA_TIMEOUT=5m \
     OLLAMA_RETRIES=3
 
-# Puerto de la aplicación
+# Puerto de la aplicacion
 EXPOSE 9999
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:9999/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:9999/health || exit 1
 
 # Comando de inicio
 CMD ["./chat-empleados"]

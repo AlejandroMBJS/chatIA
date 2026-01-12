@@ -2,6 +2,8 @@
 # ========================================
 # IRIS Chat - Setup inicial
 # ========================================
+# Ejecutar despues de git clone/pull
+# ========================================
 
 set -e
 
@@ -15,7 +17,14 @@ echo "  IRIS Chat - Setup Inicial"
 echo "========================================"
 echo ""
 
+# Hacer ejecutables todos los scripts
+echo "Configurando permisos de scripts..."
+chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
+echo "[OK] Scripts configurados"
+
 # Verificar Docker
+echo ""
+echo "Verificando Docker..."
 if ! command -v docker &> /dev/null; then
     echo "[ERROR] Docker no esta instalado"
     echo "        Instala Docker: https://docs.docker.com/get-docker/"
@@ -35,6 +44,14 @@ echo ""
 echo "Verificando Ollama..."
 if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
     echo "[OK] Ollama esta corriendo en localhost:11434"
+
+    # Verificar si el modelo esta disponible
+    if curl -s http://localhost:11434/api/tags | grep -q "deepseek-r1"; then
+        echo "[OK] Modelo deepseek-r1 disponible"
+    else
+        echo "[WARN] Modelo deepseek-r1 no encontrado"
+        echo "       Ejecuta: ollama pull deepseek-r1:14b"
+    fi
 else
     echo "[WARN] Ollama no esta corriendo"
     echo "       Para iniciar Ollama: ollama serve"
@@ -47,7 +64,7 @@ echo "Preparando directorios..."
 mkdir -p "$PROJECT_DIR/data"
 echo "[OK] Directorio de datos listo"
 
-# Construir imagen
+# Construir imagen Docker
 echo ""
 echo "Construyendo imagen Docker..."
 docker compose build

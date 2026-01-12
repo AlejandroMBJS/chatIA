@@ -15,6 +15,9 @@ echo "  IRIS Chat - Iniciando servicio"
 echo "========================================"
 echo ""
 
+# Hacer ejecutables los scripts por si acaso
+chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
+
 # Verificar si ya esta corriendo
 if docker compose ps --status running 2>/dev/null | grep -q "iris-chat"; then
     echo "[INFO] El servicio ya esta corriendo"
@@ -25,7 +28,14 @@ if docker compose ps --status running 2>/dev/null | grep -q "iris-chat"; then
     exit 0
 fi
 
+# Verificar si la imagen existe, si no, construirla
+if ! docker images | grep -q "iris-chat\|giachat"; then
+    echo "[INFO] Imagen no encontrada, construyendo..."
+    docker compose build
+fi
+
 # Verificar Ollama
+echo ""
 if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
     echo "[OK] Ollama disponible"
 else
@@ -33,6 +43,9 @@ else
     echo "       La IA no estara disponible hasta que inicies Ollama"
     echo ""
 fi
+
+# Crear directorio de datos
+mkdir -p "$PROJECT_DIR/data"
 
 # Iniciar servicio
 echo "Iniciando contenedor..."
