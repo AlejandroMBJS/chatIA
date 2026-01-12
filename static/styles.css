@@ -603,7 +603,7 @@ body {
 }
 
 .ai-input-form .model-selector-row label {
-    color: var(--text-muted);
+    color: var(--text-light);
 }
 
 .ai-input-form .model-select {
@@ -612,13 +612,13 @@ body {
     padding: 0.375rem 0.5rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
+    background: var(--card-bg);
+    color: var(--text);
     font-size: 0.875rem;
 }
 
 .ai-input-form .model-indicator {
-    color: var(--text-muted);
+    color: var(--text-light);
     font-size: 0.75rem;
 }
 
