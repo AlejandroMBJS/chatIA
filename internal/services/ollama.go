@@ -56,13 +56,25 @@ type StreamChunk struct {
 }
 
 type OllamaService struct {
-	cfg         *config.Config
-	client      *http.Client
-	security    *SecurityService
-	available   bool
-	availMutex  sync.RWMutex
-	lastCheck   time.Time
-	checkPeriod time.Duration
+	cfg          *config.Config
+	client       *http.Client
+	security     *SecurityService
+	available    bool
+	availMutex   sync.RWMutex
+	lastCheck    time.Time
+	checkPeriod  time.Duration
+	currentModel string
+	modelMutex   sync.RWMutex
+}
+
+type OllamaModel struct {
+	Name       string `json:"name"`
+	ModifiedAt string `json:"modified_at"`
+	Size       int64  `json:"size"`
+}
+
+type OllamaModelsResponse struct {
+	Models []OllamaModel `json:"models"`
 }
 
 func NewOllamaService(cfg *config.Config, security *SecurityService) *OllamaService {
@@ -77,8 +89,9 @@ func NewOllamaService(cfg *config.Config, security *SecurityService) *OllamaServ
 				MaxIdleConnsPerHost: 10,
 			},
 		},
-		security:    security,
-		checkPeriod: 30 * time.Second,
+		security:     security,
+		checkPeriod:  30 * time.Second,
+		currentModel: cfg.OllamaModel,
 	}
 
 	// Verificar disponibilidad inicial
@@ -142,7 +155,7 @@ func (o *OllamaService) Chat(ctx context.Context, messages []Message, userID int
 	messagesWithSystem = append(messagesWithSystem, messages...)
 
 	reqBody := ChatRequest{
-		Model:    o.cfg.OllamaModel,
+		Model:    o.GetModel(),
 		Messages: messagesWithSystem,
 		Stream:   false,
 		Options: &Options{
@@ -266,7 +279,7 @@ func (o *OllamaService) ChatStream(ctx context.Context, messages []Message, user
 	messagesWithSystem = append(messagesWithSystem, messages...)
 
 	reqBody := ChatRequest{
-		Model:    o.cfg.OllamaModel,
+		Model:    o.GetModel(),
 		Messages: messagesWithSystem,
 		Stream:   true,
 		Options: &Options{
@@ -376,5 +389,38 @@ func (o *OllamaService) IsAvailable(ctx context.Context) bool {
 }
 
 func (o *OllamaService) GetModel() string {
-	return o.cfg.OllamaModel
+	o.modelMutex.RLock()
+	defer o.modelMutex.RUnlock()
+	return o.currentModel
+}
+
+func (o *OllamaService) SetModel(model string) {
+	o.modelMutex.Lock()
+	defer o.modelMutex.Unlock()
+	o.currentModel = model
+	log.Printf("[INFO] Modelo de IA cambiado a: %s", model)
+}
+
+func (o *OllamaService) ListModels(ctx context.Context) ([]OllamaModel, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", o.cfg.OllamaURL+"/api/tags", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := o.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("error listing models: %d", resp.StatusCode)
+	}
+
+	var result OllamaModelsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result.Models, nil
 }

@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS ai_messages (
 -- Tabla para configurar filtros que previenen fugas de informacion
 CREATE TABLE IF NOT EXISTS security_filters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
+    name TEXT UNIQUE NOT NULL,
     description TEXT DEFAULT '',
     filter_type TEXT NOT NULL CHECK (filter_type IN ('keyword', 'regex', 'category')),
     pattern TEXT NOT NULL,

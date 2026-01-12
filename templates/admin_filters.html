@@ -104,6 +104,32 @@
     </section>
 
     <section class="admin-section">
+        <details>
+            <summary><h2 style="display:inline;cursor:pointer;">Guia de Filtros</h2></summary>
+            <div class="help-content">
+                <h4>Tipos de Filtro:</h4>
+                <ul>
+                    <li><strong>Palabras clave:</strong> Lista separada por comas. Ej: <code>salario,nomina,confidencial</code></li>
+                    <li><strong>Expresion regular:</strong> Patron regex. Ej: <code>(?i)contrase[nñ]a.*de</code></li>
+                    <li><strong>Categoria:</strong> Texto simple para buscar.</li>
+                </ul>
+                <h4>Acciones:</h4>
+                <ul>
+                    <li><strong>Bloquear:</strong> Impide el envio del mensaje completamente.</li>
+                    <li><strong>Advertir:</strong> Registra pero permite el mensaje.</li>
+                    <li><strong>Registrar:</strong> Solo guarda en logs sin notificar.</li>
+                </ul>
+                <h4>Ejemplos de Patrones Regex:</h4>
+                <ul>
+                    <li><code>(?i)hackear</code> - Detecta "hackear" sin importar mayusculas</li>
+                    <li><code>\b\d{16}\b</code> - Detecta numeros de 16 digitos (tarjetas)</li>
+                    <li><code>(?i)(dame|muestrame).*datos.*de</code> - Detecta solicitudes de datos de otros</li>
+                </ul>
+            </div>
+        </details>
+    </section>
+
+    <section class="admin-section">
         <h2>Filtros Existentes ({{len .Filters}})</h2>
         <div class="filters-list" hx-target="closest .filter-item" hx-swap="outerHTML">
             {{range .Filters}}
@@ -144,32 +170,6 @@
             {{else}}
             <p class="empty-message">No hay filtros configurados</p>
             {{end}}
-        </div>
-    </section>
-
-    <section class="admin-section">
-        <h2>Guia de Filtros</h2>
-        <div class="help-content">
-            <h4>Tipos de Filtro:</h4>
-            <ul>
-                <li><strong>Palabras clave:</strong> Lista separada por comas. Ej: <code>salario,nomina,confidencial</code></li>
-                <li><strong>Expresion regular:</strong> Patron regex. Ej: <code>(?i)contrase[nñ]a.*de</code></li>
-                <li><strong>Categoria:</strong> Texto simple para buscar.</li>
-            </ul>
-
-            <h4>Acciones:</h4>
-            <ul>
-                <li><strong>Bloquear:</strong> Impide el envio del mensaje completamente.</li>
-                <li><strong>Advertir:</strong> Registra pero permite el mensaje.</li>
-                <li><strong>Registrar:</strong> Solo guarda en logs sin notificar.</li>
-            </ul>
-
-            <h4>Ejemplos de Patrones Regex:</h4>
-            <ul>
-                <li><code>(?i)hackear</code> - Detecta "hackear" sin importar mayusculas</li>
-                <li><code>\b\d{16}\b</code> - Detecta numeros de 16 digitos (tarjetas)</li>
-                <li><code>(?i)(dame|muestrame).*datos.*de</code> - Detecta solicitudes de datos de otros</li>
-            </ul>
         </div>
     </section>
 </div>

@@ -130,6 +130,44 @@
                     </div>
                     <p>{{.FilterCount}} {{if eq .Lang "en"}}active filters protecting the system{{else}}filtros activos protegiendo el sistema{{end}}.</p>
                 </section>
+
+                <section class="admin-section">
+                    <div class="section-header">
+                        <h2>{{if eq .Lang "en"}}AI Model{{else}}Modelo de IA{{end}}</h2>
+                    </div>
+                    <div id="model-selector">
+                        <p>{{if eq .Lang "en"}}Loading models...{{else}}Cargando modelos...{{end}}</p>
+                    </div>
+                    <script>
+                    (function() {
+                        const container = document.getElementById('model-selector');
+                        fetch('/ai/models')
+                            .then(r => r.json())
+                            .then(data => {
+                                if (!data.models || data.models.length === 0) {
+                                    container.innerHTML = '<p class="empty-message">{{if eq .Lang "en"}}No models available{{else}}No hay modelos disponibles{{end}}</p>';
+                                    return;
+                                }
+                                let html = '<form hx-post="/ai/model" hx-swap="none" class="model-form">';
+                                html += '<select name="model" class="form-select">';
+                                data.models.forEach(m => {
+                                    const size = (m.size / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+                                    const selected = m.name === data.current_model ? 'selected' : '';
+                                    html += '<option value="' + m.name + '" ' + selected + '>' + m.name + ' (' + size + ')</option>';
+                                });
+                                html += '</select>';
+                                html += '<button type="submit" class="btn btn-primary btn-sm">{{if eq .Lang "en"}}Change{{else}}Cambiar{{end}}</button>';
+                                html += '</form>';
+                                html += '<p class="model-current">{{if eq .Lang "en"}}Current{{else}}Actual{{end}}: <strong>' + data.current_model + '</strong></p>';
+                                container.innerHTML = html;
+                                htmx.process(container);
+                            })
+                            .catch(err => {
+                                container.innerHTML = '<p class="empty-message">{{if eq .Lang "en"}}Error loading models{{else}}Error cargando modelos{{end}}</p>';
+                            });
+                    })();
+                    </script>
+                </section>
             </div>
         </div>
     </main>

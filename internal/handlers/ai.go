@@ -652,3 +652,56 @@ func (h *AIHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(status)
 }
+
+// ListModels devuelve la lista de modelos disponibles en Ollama
+func (h *AIHandler) ListModels(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	models, err := h.ollama.ListModels(ctx)
+	if err != nil {
+		log.Printf("[ERROR] Error listando modelos: %v", err)
+		http.Error(w, "Error obteniendo modelos", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"models":        models,
+		"current_model": h.ollama.GetModel(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// SetModel cambia el modelo de IA actual
+func (h *AIHandler) SetModel(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Error procesando formulario", http.StatusBadRequest)
+		return
+	}
+
+	model := strings.TrimSpace(r.FormValue("model"))
+	if model == "" {
+		http.Error(w, "Modelo no especificado", http.StatusBadRequest)
+		return
+	}
+
+	h.ollama.SetModel(model)
+
+	user := middleware.GetUserFromContext(r.Context())
+	log.Printf("[INFO] Usuario %s cambió el modelo a: %s", user.Nomina, model)
+
+	// Si es una petición HTMX, redirigir
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "ok",
+		"model":  model,
+	})
+}

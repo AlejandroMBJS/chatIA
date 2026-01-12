@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"chat-empleados/db"
@@ -119,6 +120,8 @@ func main() {
 	mux.Handle("DELETE /ai/conversation/{id}", authMiddleware.RequireAuth(http.HandlerFunc(aiHandler.DeleteConversation)))
 	mux.Handle("GET /ai/conversation/{id}/messages", authMiddleware.RequireAuth(http.HandlerFunc(aiHandler.GetConversationMessages)))
 	mux.Handle("GET /ai/health", http.HandlerFunc(aiHandler.HealthCheck))
+	mux.Handle("GET /ai/models", authMiddleware.RequireAdmin(http.HandlerFunc(aiHandler.ListModels)))
+	mux.Handle("POST /ai/model", authMiddleware.RequireAdmin(http.HandlerFunc(aiHandler.SetModel)))
 
 	mux.Handle("GET /profile", authMiddleware.RequireAuth(http.HandlerFunc(authHandler.Profile)))
 	mux.Handle("POST /profile/password", authMiddleware.RequireAuth(http.HandlerFunc(authHandler.ChangePassword)))
@@ -176,6 +179,11 @@ func main() {
 }
 
 func initDB(dbPath string) (*sql.DB, error) {
+	needsInit := false
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		needsInit = true
+	}
+
 	database, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, err
@@ -185,8 +193,8 @@ func initDB(dbPath string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	// Siempre ejecutar schema.sql para crear tablas faltantes
-	// Todas las sentencias usan IF NOT EXISTS y INSERT OR IGNORE
+	// Ejecutar schema.sql completo solo si es base de datos nueva
+	// o ejecutar solo estructura si ya existe
 	log.Printf("[INFO] Verificando esquema de base de datos...")
 	schemaPath := filepath.Join(".", "schema.sql")
 	schema, err := os.ReadFile(schemaPath)
@@ -194,10 +202,19 @@ func initDB(dbPath string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	if _, err := database.Exec(string(schema)); err != nil {
-		return nil, err
+	if needsInit {
+		// Base de datos nueva: ejecutar todo el schema
+		if _, err := database.Exec(string(schema)); err != nil {
+			return nil, err
+		}
+		log.Printf("[INFO] Base de datos inicializada")
+	} else {
+		// Base de datos existente: solo ejecutar CREATE TABLE/INDEX (no INSERT)
+		if err := ensureTablesExist(database, string(schema)); err != nil {
+			log.Printf("[WARN] Error verificando tablas: %v", err)
+		}
+		log.Printf("[INFO] Esquema de base de datos verificado")
 	}
-	log.Printf("[INFO] Esquema de base de datos verificado")
 
 	// Siempre asegurar que exista el usuario admin
 	if err := ensureAdminUser(database); err != nil {
@@ -205,6 +222,25 @@ func initDB(dbPath string) (*sql.DB, error) {
 	}
 
 	return database, nil
+}
+
+// ensureTablesExist ejecuta solo las sentencias CREATE TABLE e INDEX del schema
+func ensureTablesExist(database *sql.DB, schema string) error {
+	lines := strings.Split(schema, ";")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		upperLine := strings.ToUpper(line)
+		// Solo ejecutar CREATE TABLE y CREATE INDEX
+		if strings.HasPrefix(upperLine, "CREATE TABLE") || strings.HasPrefix(upperLine, "CREATE INDEX") || strings.HasPrefix(upperLine, "CREATE UNIQUE INDEX") {
+			if _, err := database.Exec(line); err != nil {
+				// Ignorar errores de tablas/índices que ya existen
+				if !strings.Contains(err.Error(), "already exists") {
+					log.Printf("[WARN] Error ejecutando: %s... - %v", line[:min(50, len(line))], err)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // ensureAdminUser se asegura de que exista un usuario admin con las credenciales predeterminadas
