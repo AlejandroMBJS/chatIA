@@ -123,6 +123,7 @@ func (h *AIHandler) AIPage(w http.ResponseWriter, r *http.Request) {
 
 	var currentConv *db.AiConversation
 	var messages []db.GetConversationMessagesRow
+	var currentModel string
 
 	convIDStr := r.URL.Query().Get("conv")
 	if convIDStr != "" {
@@ -135,11 +136,24 @@ func (h *AIHandler) AIPage(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				currentConv = &conv
 				messages, _ = h.queries.GetConversationMessages(r.Context(), convID)
+				// Usar modelo de la conversacion o fallback al global
+				if conv.Model.Valid && conv.Model.String != "" {
+					currentModel = conv.Model.String
+				} else {
+					currentModel = h.ollama.GetModel()
+				}
 			}
 		}
 	}
 
+	if currentModel == "" {
+		currentModel = h.ollama.GetModel()
+	}
+
 	ollamaAvailable := h.ollama.IsAvailable(r.Context())
+
+	// Obtener lista de modelos disponibles
+	models, _ := h.ollama.ListModels(r.Context())
 
 	data := TemplateData(r, map[string]interface{}{
 		"Title":            Tr(r, "ai_chat"),
@@ -148,7 +162,9 @@ func (h *AIHandler) AIPage(w http.ResponseWriter, r *http.Request) {
 		"CurrentConv":      currentConv,
 		"Messages":         messages,
 		"OllamaAvailable":  ollamaAvailable,
-		"Model":            h.ollama.GetModel(),
+		"Model":            currentModel,
+		"Models":           models,
+		"GlobalModel":      h.ollama.GetModel(),
 	})
 	h.templates.ExecuteTemplate(w, "ai", data)
 }
@@ -156,9 +172,16 @@ func (h *AIHandler) AIPage(w http.ResponseWriter, r *http.Request) {
 func (h *AIHandler) NewConversation(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUserFromContext(r.Context())
 
+	// Obtener modelo del query param o usar el global
+	model := r.URL.Query().Get("model")
+	if model == "" {
+		model = h.ollama.GetModel()
+	}
+
 	conv, err := h.queries.CreateAIConversation(r.Context(), db.CreateAIConversationParams{
 		UserID: user.ID,
 		Title:  sql.NullString{String: "Nueva conversacion", Valid: true},
+		Model:  sql.NullString{String: model, Valid: model != ""},
 	})
 	if err != nil {
 		log.Printf("[ERROR] Error creando conversacion: %v", err)
@@ -194,11 +217,17 @@ func (h *AIHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	var convID int64
 	var err error
+	model := r.FormValue("model")
 
 	if convIDStr == "" || convIDStr == "0" {
+		// Usar modelo del form o el global
+		if model == "" {
+			model = h.ollama.GetModel()
+		}
 		conv, err := h.queries.CreateAIConversation(r.Context(), db.CreateAIConversationParams{
 			UserID: user.ID,
 			Title:  sql.NullString{String: truncateTitle(content), Valid: true},
+			Model:  sql.NullString{String: model, Valid: model != ""},
 		})
 		if err != nil {
 			log.Printf("[ERROR] Error creando conversacion: %v", err)
@@ -425,6 +454,7 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 
 	content := strings.TrimSpace(r.FormValue("content"))
 	convIDStr := r.FormValue("conversation_id")
+	selectedModel := r.FormValue("model")
 
 	if content == "" {
 		http.Error(w, "El mensaje no puede estar vacio", http.StatusBadRequest)
@@ -440,11 +470,18 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 
 	var convID int64
 	var err error
+	var convModel string
 
 	if convIDStr == "" || convIDStr == "0" {
+		// Nueva conversacion - usar modelo seleccionado o global
+		if selectedModel == "" {
+			selectedModel = h.ollama.GetModel()
+		}
+		convModel = selectedModel
 		conv, err := h.queries.CreateAIConversation(r.Context(), db.CreateAIConversationParams{
 			UserID: user.ID,
 			Title:  sql.NullString{String: truncateTitle(content), Valid: true},
+			Model:  sql.NullString{String: selectedModel, Valid: selectedModel != ""},
 		})
 		if err != nil {
 			log.Printf("[ERROR] Error creando conversacion: %v", err)
@@ -464,6 +501,14 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[SECURITY] Usuario %s intento acceder a conversacion %d sin permiso", user.Nomina, convID)
 			http.Error(w, "No tienes acceso a esta conversacion", http.StatusForbidden)
 			return
+		}
+
+		// Obtener modelo de la conversacion existente
+		conv, err := h.queries.GetConversationByID(r.Context(), convID)
+		if err == nil && conv.Model.Valid && conv.Model.String != "" {
+			convModel = conv.Model.String
+		} else {
+			convModel = h.ollama.GetModel() // Fallback al modelo global
 		}
 	}
 
@@ -507,7 +552,7 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	log.Printf("[DEBUG] Iniciando streaming con %d mensajes para usuario %d", len(messages), user.ID)
+	log.Printf("[DEBUG] Iniciando streaming con %d mensajes para usuario %d, modelo: %s", len(messages), user.ID, convModel)
 
 	// Configurar SSE
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -521,9 +566,9 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enviar evento inicial con ID de conversación
-	log.Printf("[DEBUG] Enviando evento start con convID=%d", convID)
-	fmt.Fprintf(w, "data: {\"conversation_id\": %d}\n\n", convID)
+	// Enviar evento inicial con ID de conversación y modelo
+	log.Printf("[DEBUG] Enviando evento start con convID=%d, modelo=%s", convID, convModel)
+	fmt.Fprintf(w, "data: {\"conversation_id\": %d, \"model\": \"%s\"}\n\n", convID, convModel)
 	flusher.Flush()
 
 	var fullResponse strings.Builder
@@ -536,12 +581,12 @@ func (h *AIHandler) SendMessageStream(w http.ResponseWriter, r *http.Request) {
 	streamCtx, cancelStream := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancelStream()
 
-	log.Printf("[DEBUG] Llamando a ChatStream...")
+	log.Printf("[DEBUG] Llamando a ChatStreamWithModel con modelo: %s", convModel)
 
 	// Iniciar streaming en goroutine
 	go func() {
 		defer close(streamDone)
-		filterResult, streamErr = h.ollama.ChatStream(streamCtx, messages, user.ID, func(chunk string) error {
+		filterResult, streamErr = h.ollama.ChatStreamWithModel(streamCtx, messages, user.ID, convModel, func(chunk string) error {
 			gotFirstChunk = true
 			fullResponse.WriteString(chunk)
 

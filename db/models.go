@@ -13,6 +13,7 @@ type AiConversation struct {
 	ID        int64          `json:"id"`
 	UserID    int64          `json:"user_id"`
 	Title     sql.NullString `json:"title"`
+	Model     sql.NullString `json:"model"`
 	CreatedAt sql.NullTime   `json:"created_at"`
 	UpdatedAt sql.NullTime   `json:"updated_at"`
 }

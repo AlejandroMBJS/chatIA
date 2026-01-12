@@ -24,7 +24,9 @@
                     <a href="/ai?conv={{.ID}}"
                        class="conversation-item {{if and $.CurrentConv (eq $.CurrentConv.ID .ID)}}active{{end}}">
                         <span class="conv-title">{{.Title.String}}</span>
-                        <span class="conv-date">{{formatDate .UpdatedAt}}</span>
+                        <span class="conv-meta">
+                            {{if .Model.Valid}}{{.Model.String}}{{else}}{{$.GlobalModel}}{{end}} - {{formatDate .UpdatedAt}}
+                        </span>
                     </a>
                     {{else}}
                     <p class="no-conversations">{{if eq $.Lang "en"}}No conversations{{else}}No hay conversaciones{{end}}</p>
@@ -37,7 +39,7 @@
                     {{else}}
                     <span class="status-badge status-offline">{{if eq .Lang "en"}}AI Unavailable{{else}}IA No Disponible{{end}}</span>
                     {{end}}
-                    <small>{{if eq .Lang "en"}}Model{{else}}Modelo{{end}}: {{.Model}}</small>
+                    <small>{{if eq .Lang "en"}}Default{{else}}Predeterminado{{end}}: {{.GlobalModel}}</small>
                 </div>
             </div>
 
@@ -85,12 +87,30 @@
 
                 <form id="ai-form" class="ai-input-form">
                     <input type="hidden" name="conversation_id" value="{{if .CurrentConv}}{{.CurrentConv.ID}}{{else}}0{{end}}">
-                    <textarea name="content" id="ai-input"
-                              placeholder="{{if eq .Lang "en"}}Write your message...{{else}}Escribe tu mensaje...{{end}}"
-                              rows="2" maxlength="4000"></textarea>
-                    <button type="submit" class="btn btn-primary">
-                        {{if eq .Lang "en"}}Send{{else}}Enviar{{end}}
-                    </button>
+                    {{if not .CurrentConv}}
+                    <div class="model-selector-row">
+                        <label for="model-select">{{if eq .Lang "en"}}Model{{else}}Modelo{{end}}:</label>
+                        <select name="model" id="model-select" class="model-select">
+                            {{range .Models}}
+                            <option value="{{.Name}}" {{if eq .Name $.Model}}selected{{end}}>{{.Name}}</option>
+                            {{else}}
+                            <option value="{{.GlobalModel}}">{{.GlobalModel}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+                    {{else}}
+                    <div class="model-indicator">
+                        <small>{{if eq .Lang "en"}}Model{{else}}Modelo{{end}}: {{.Model}}</small>
+                    </div>
+                    {{end}}
+                    <div class="input-row">
+                        <textarea name="content" id="ai-input"
+                                  placeholder="{{if eq .Lang "en"}}Write your message...{{else}}Escribe tu mensaje...{{end}}"
+                                  rows="2" maxlength="4000"></textarea>
+                        <button type="submit" class="btn btn-primary">
+                            {{if eq .Lang "en"}}Send{{else}}Enviar{{end}}
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

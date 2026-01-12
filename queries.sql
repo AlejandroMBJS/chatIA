@@ -102,12 +102,12 @@ SELECT COUNT(*) as count FROM group_messages;
 -- ============ AI CONVERSATIONS ============
 
 -- name: CreateAIConversation :one
-INSERT INTO ai_conversations (user_id, title)
-VALUES (?, ?)
+INSERT INTO ai_conversations (user_id, title, model)
+VALUES (?, ?, ?)
 RETURNING *;
 
 -- name: GetUserConversations :many
-SELECT id, title, created_at, updated_at
+SELECT id, title, model, created_at, updated_at
 FROM ai_conversations
 WHERE user_id = ?
 ORDER BY updated_at DESC

@@ -457,9 +457,14 @@ body {
     text-overflow: ellipsis;
 }
 
-.conv-date {
-    font-size: 0.75rem;
+.conv-date,
+.conv-meta {
+    font-size: 0.7rem;
     color: var(--text-light);
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .sidebar-footer {
@@ -584,9 +589,42 @@ body {
 
 .ai-input-form {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
     padding: 1rem;
     border-top: 1px solid var(--border);
+}
+
+.ai-input-form .model-selector-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.ai-input-form .model-selector-row label {
+    color: var(--text-muted);
+}
+
+.ai-input-form .model-select {
+    flex: 1;
+    max-width: 300px;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.ai-input-form .model-indicator {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.ai-input-form .input-row {
+    display: flex;
+    gap: 0.5rem;
 }
 
 .ai-input-form textarea {

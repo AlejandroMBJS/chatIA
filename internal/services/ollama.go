@@ -256,6 +256,10 @@ func (o *OllamaService) markUnavailable() {
 }
 
 func (o *OllamaService) ChatStream(ctx context.Context, messages []Message, userID int64, onChunk func(string) error) (*FilterResult, error) {
+	return o.ChatStreamWithModel(ctx, messages, userID, "", onChunk)
+}
+
+func (o *OllamaService) ChatStreamWithModel(ctx context.Context, messages []Message, userID int64, model string, onChunk func(string) error) (*FilterResult, error) {
 	log.Printf("[DEBUG] ChatStream: iniciando para usuario %d", userID)
 
 	if len(messages) > 0 {
@@ -271,6 +275,12 @@ func (o *OllamaService) ChatStream(ctx context.Context, messages []Message, user
 		}
 	}
 
+	// Usar modelo específico o el global
+	useModel := model
+	if useModel == "" {
+		useModel = o.GetModel()
+	}
+
 	messagesWithSystem := make([]Message, 0, len(messages)+1)
 	messagesWithSystem = append(messagesWithSystem, Message{
 		Role:    "system",
@@ -279,7 +289,7 @@ func (o *OllamaService) ChatStream(ctx context.Context, messages []Message, user
 	messagesWithSystem = append(messagesWithSystem, messages...)
 
 	reqBody := ChatRequest{
-		Model:    o.GetModel(),
+		Model:    useModel,
 		Messages: messagesWithSystem,
 		Stream:   true,
 		Options: &Options{

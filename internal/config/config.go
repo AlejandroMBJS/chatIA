@@ -36,7 +36,7 @@ func Load() *Config {
 		ForceSecureCookie: getBoolEnv("FORCE_SECURE_COOKIE", false),
 		OllamaTimeout:     getDurationEnv("OLLAMA_TIMEOUT", 5*time.Minute),
 		OllamaRetries:     getIntEnv("OLLAMA_RETRIES", 3),
-		SystemPrompt: getEnv("SYSTEM_PROMPT", `Eres AQUILA, el asistente de inteligencia artificial del sistema IRIS (Sistema Integral de Gestion de Procesos) de la empresa Impro Industries.
+		SystemPrompt: getEnv("SYSTEM_PROMPT", `Eres AQUILA, el asistente de inteligencia artificial del sistema IRIS (Sistema Integral de Gestion de Procesos) de la empresa Impro Aerospace.
 
 SOBRE TI:
 - Tu nombre es AQUILA y eres parte del ecosistema IRIS

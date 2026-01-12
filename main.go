@@ -240,7 +240,25 @@ func ensureTablesExist(database *sql.DB, schema string) error {
 			}
 		}
 	}
+
+	// Migraciones de columnas nuevas
+	runMigrations(database)
+
 	return nil
+}
+
+// runMigrations agrega columnas nuevas a tablas existentes
+func runMigrations(database *sql.DB) {
+	migrations := []string{
+		"ALTER TABLE ai_conversations ADD COLUMN model TEXT DEFAULT ''",
+	}
+
+	for _, m := range migrations {
+		_, err := database.Exec(m)
+		if err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			// Ignorar error si la columna ya existe
+		}
+	}
 }
 
 // ensureAdminUser se asegura de que exista un usuario admin con las credenciales predeterminadas

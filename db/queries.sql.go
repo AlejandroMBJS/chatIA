@@ -183,24 +183,26 @@ func (q *Queries) CountUserConversations(ctx context.Context, userID int64) (int
 
 const createAIConversation = `-- name: CreateAIConversation :one
 
-INSERT INTO ai_conversations (user_id, title)
-VALUES (?, ?)
-RETURNING id, user_id, title, created_at, updated_at
+INSERT INTO ai_conversations (user_id, title, model)
+VALUES (?, ?, ?)
+RETURNING id, user_id, title, model, created_at, updated_at
 `
 
 type CreateAIConversationParams struct {
 	UserID int64          `json:"user_id"`
 	Title  sql.NullString `json:"title"`
+	Model  sql.NullString `json:"model"`
 }
 
 // ============ AI CONVERSATIONS ============
 func (q *Queries) CreateAIConversation(ctx context.Context, arg CreateAIConversationParams) (AiConversation, error) {
-	row := q.db.QueryRowContext(ctx, createAIConversation, arg.UserID, arg.Title)
+	row := q.db.QueryRowContext(ctx, createAIConversation, arg.UserID, arg.Title, arg.Model)
 	var i AiConversation
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.Title,
+		&i.Model,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -1237,7 +1239,7 @@ func (q *Queries) GetConfig(ctx context.Context, key string) (string, error) {
 }
 
 const getConversation = `-- name: GetConversation :one
-SELECT id, user_id, title, created_at, updated_at FROM ai_conversations
+SELECT id, user_id, title, model, created_at, updated_at FROM ai_conversations
 WHERE id = ? AND user_id = ?
 `
 
@@ -1253,6 +1255,7 @@ func (q *Queries) GetConversation(ctx context.Context, arg GetConversationParams
 		&i.ID,
 		&i.UserID,
 		&i.Title,
+		&i.Model,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -1260,7 +1263,7 @@ func (q *Queries) GetConversation(ctx context.Context, arg GetConversationParams
 }
 
 const getConversationByID = `-- name: GetConversationByID :one
-SELECT id, user_id, title, created_at, updated_at FROM ai_conversations WHERE id = ?
+SELECT id, user_id, title, model, created_at, updated_at FROM ai_conversations WHERE id = ?
 `
 
 func (q *Queries) GetConversationByID(ctx context.Context, id int64) (AiConversation, error) {
@@ -1270,6 +1273,7 @@ func (q *Queries) GetConversationByID(ctx context.Context, id int64) (AiConversa
 		&i.ID,
 		&i.UserID,
 		&i.Title,
+		&i.Model,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -2434,7 +2438,7 @@ func (q *Queries) GetUserByNomina(ctx context.Context, nomina string) (User, err
 }
 
 const getUserConversations = `-- name: GetUserConversations :many
-SELECT id, title, created_at, updated_at
+SELECT id, title, model, created_at, updated_at
 FROM ai_conversations
 WHERE user_id = ?
 ORDER BY updated_at DESC
@@ -2444,6 +2448,7 @@ LIMIT 50
 type GetUserConversationsRow struct {
 	ID        int64          `json:"id"`
 	Title     sql.NullString `json:"title"`
+	Model     sql.NullString `json:"model"`
 	CreatedAt sql.NullTime   `json:"created_at"`
 	UpdatedAt sql.NullTime   `json:"updated_at"`
 }
@@ -2460,6 +2465,7 @@ func (q *Queries) GetUserConversations(ctx context.Context, userID int64) ([]Get
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
+			&i.Model,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -2634,6 +2640,21 @@ type UpdateConversationTitleParams struct {
 
 func (q *Queries) UpdateConversationTitle(ctx context.Context, arg UpdateConversationTitleParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateConversationTitle, arg.Title, arg.ID, arg.UserID)
+}
+
+const updateConversationModel = `-- name: UpdateConversationModel :execresult
+UPDATE ai_conversations
+SET model = ?, updated_at = datetime('now')
+WHERE id = ?
+`
+
+type UpdateConversationModelParams struct {
+	Model sql.NullString `json:"model"`
+	ID    int64          `json:"id"`
+}
+
+func (q *Queries) UpdateConversationModel(ctx context.Context, arg UpdateConversationModelParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateConversationModel, arg.Model, arg.ID)
 }
 
 const updateFilterCategory = `-- name: UpdateFilterCategory :execresult
