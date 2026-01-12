@@ -1,8 +1,6 @@
 module chat-empleados
 
-go 1.24.1
-
-toolchain go1.24.11
+go 1.22
 
 require (
 	github.com/go-rod/rod v0.116.2
@@ -13,7 +11,6 @@ require (
 )
 
 require (
-	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect
