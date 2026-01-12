@@ -16,3 +16,14 @@
 2026/01/12 14:07:53 [INFO] Ollama disponible en http://localhost:11434
 2026/01/12 14:07:53 [INFO] Ollama disponible y funcionando
 2026/01/12 14:07:56 [GET] /health [::1]
+2026/01/12 14:13:31 [GET] / [::1]
+2026/01/12 14:13:31 [GET] /login [::1]
+2026/01/12 14:13:31 [GET] /static/styles.css [::1]
+2026/01/12 14:13:31 [GET] /static/logo.svg [::1]
+2026/01/12 14:13:31 [GET] /favicon.ico [::1]
+2026/01/12 14:13:31 [GET] /login [::1]
+2026/01/12 14:13:33 [GET] /login [::1]
+2026/01/12 14:13:33 [GET] /static/styles.css [::1]
+2026/01/12 14:13:33 [GET] /static/logo.svg [::1]
+2026/01/12 14:13:33 [GET] /favicon.ico [::1]
+2026/01/12 14:13:33 [GET] /login [::1]
